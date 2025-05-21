@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import Wrapper from '../components/Wrapper'
 import { useUser } from '@clerk/nextjs'
 import { Product } from '@/type'
@@ -19,7 +19,7 @@ const Page = () => {
     const [categoryFilter, setCategoryFilter] = useState('')
 
     // Récupérer les produits avec filtres
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         try {
             if (email) {
                 const products = await readProducts(email, {
@@ -34,12 +34,13 @@ const Page = () => {
         } catch (error) {
             console.error(error)
         }
-    }
+    }, [email, searchTerm, categoryFilter]) // All dependencies declared
 
     useEffect(() => {
-        if (email)
+        if (email) {
             fetchProducts()
-    }, [email, searchTerm, categoryFilter])
+        }
+    }, [email, searchTerm, categoryFilter, fetchProducts]) // All dependencies declared
 
     const handleDeleteProduct = async (product: Product) => {
         const confirmDelete = confirm("Voulez-vous vraiment supprimer ce produit ?")
@@ -64,6 +65,7 @@ const Page = () => {
             }
         } catch (error) {
             console.error(error)
+            toast.error("Erreur lors de la suppression du produit")
         }
     }
 

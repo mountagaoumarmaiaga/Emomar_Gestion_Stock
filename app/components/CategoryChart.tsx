@@ -1,5 +1,5 @@
 import { ChartData } from '@/type'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { getProductCategoryDistribution } from '../actions'
 import {
   ResponsiveContainer,
@@ -25,7 +25,7 @@ const CategoryChart = ({ email }: { email: string }) => {
     grid: "#e0e0e0"
   }
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       if (email) {
         const data = await getProductCategoryDistribution(email)
@@ -36,13 +36,13 @@ const CategoryChart = ({ email }: { email: string }) => {
     } catch (error) {
       console.error(error)
     }
-  }
+  }, [email]) // email est la seule dépendance de fetchStats
 
   useEffect(() => {
-    if (email)
+    if (email) {
       fetchStats()
-  }, [email])
-
+    }
+  }, [email, fetchStats]) // Maintenant toutes les dépendances sont déclarées
 
   const renderChart = () => (
     <ResponsiveContainer width="100%" height={300}>

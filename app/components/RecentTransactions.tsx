@@ -1,5 +1,5 @@
 import { Transaction } from '@/type'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { getTransactions } from '../actions'
 import EmptyState from './EmptyState'
 import TransactionComponent from './TransactionComponent'
@@ -7,8 +7,8 @@ import TransactionComponent from './TransactionComponent'
 const RecentTransactions = ({ email }: { email: string }) => {
     const [transactions, setTransactions] = useState<Transaction[]>([])
 
-
-    const fetchData = async () => {
+    // 1. On memoize la fonction fetchData avec useCallback
+    const fetchData = useCallback(async () => {
         try {
             if (email) {
                 const txs = await getTransactions(email, 10)
@@ -19,16 +19,18 @@ const RecentTransactions = ({ email }: { email: string }) => {
         } catch (error) {
             console.error(error)
         }
-    }
+    }, [email]) // email est la seule dépendance
 
+    // 2. On utilise useEffect avec toutes les dépendances nécessaires
     useEffect(() => {
-        if (email)
+        if (email) {
             fetchData()
-    }, [email])
+        }
+    }, [email, fetchData]) // On inclut fetchData dans les dépendances
 
     return (
         <div className='w-full border-2 border-base-200 mt-4 p-4 rounded-3xl'>
-            {transactions.length == 0 ? (
+            {transactions.length === 0 ? (
                 <EmptyState
                     message='Aucune Transaction pour le moment'
                     IconComponent='CaptionsOff'
@@ -43,7 +45,6 @@ const RecentTransactions = ({ email }: { email: string }) => {
                     </div>
                 </div>
             )}
-
         </div>
     )
 }

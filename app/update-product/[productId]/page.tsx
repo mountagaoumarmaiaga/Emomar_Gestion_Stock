@@ -6,12 +6,10 @@ import { FormDataType, Product } from '@/type'
 import { useUser } from '@clerk/nextjs'
 import { FileImage } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { toast } from 'react-toastify'
 
 const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
-
-
     const { user } = useUser()
     const email = user?.primaryEmailAddress?.emailAddress as string
     const [product, setProduct] = useState<Product | null>(null)
@@ -27,7 +25,7 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
     })
     const router = useRouter()
 
-    const fetchProduct = async () => {
+    const fetchProduct = useCallback(async () => {
         try {
             const { productId } = await params
             if (email) {
@@ -46,17 +44,17 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
             }
         } catch (error) {
             console.error(error)
+            toast.error("Failed to fetch product details")
         }
-    }
+    }, [email, params])
 
     useEffect(() => {
         fetchProduct()
-    }, [email])
-
+    }, [email, fetchProduct])
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target
-        setFormData({ ...formData, [name]: value })
+        setFormData(prev => ({ ...prev, [name]: value }))
     }
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -68,22 +66,26 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
-
-        let imageUrl = formData?.imageUrl
-
         e.preventDefault()
+        
         try {
+            let imageUrl = formData.imageUrl
+            
             if (file) {
-                const resDelete = await fetch("/api/upload", {
-                    method: "DELETE",
-                    body: JSON.stringify({ path: formData.imageUrl }),
-                    headers: { 'Content-Type': 'application/json' }
-                })
-                const dataDelete = await resDelete.json()
-                if (!dataDelete.success) {
-                    throw new Error("Erreur lors de la suppression de l’image.")
+                // Delete old image if exists
+                if (formData.imageUrl) {
+                    const resDelete = await fetch("/api/upload", {
+                        method: "DELETE",
+                        body: JSON.stringify({ path: formData.imageUrl }),
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    const dataDelete = await resDelete.json()
+                    if (!dataDelete.success) {
+                        throw new Error("Error deleting old image")
+                    }
                 }
 
+                // Upload new image
                 const imageData = new FormData()
                 imageData.append("file", file)
                 const res = await fetch("/api/upload", {
@@ -93,41 +95,47 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
 
                 const data = await res.json()
                 if (!data.success) {
-                    throw new Error("Erreur lors de l’upload de l’image.")
+                    throw new Error("Error uploading new image")
                 }
 
                 imageUrl = data.path
-                formData.imageUrl = imageUrl
-
-                await updateProduct(formData, email)
-                toast.success("Produit mis à jour avec succès !")
-                router.push("/products")
             }
-        } catch (error: any) {
+
+            // Update product with new data
+            const updatedData = {
+                ...formData,
+                imageUrl
+            }
+
+            await updateProduct(updatedData, email)
+            toast.success("Product updated successfully!")
+            router.push("/products")
+        } catch (error: unknown) {
             console.error(error)
-            toast.error(error.message)
+            const message = error instanceof Error ? error.message : "An unknown error occurred"
+            toast.error(message)
         }
     }
-
 
     return (
         <Wrapper>
             <div>
                 {product ? (
                     <div>
-                        <h1 className='text-2xl font-bold  mb-4'>
-                            Mise à jour du produit
+                        <h1 className='text-2xl font-bold mb-4'>
+                            Update Product
                         </h1>
                         <div className='flex md:flex-row flex-col md:items-center'>
                             <form className='space-y-2' onSubmit={handleSubmit}>
-                                <div className='text-sm font-semibold mb-2'>Nom</div>
+                                <div className='text-sm font-semibold mb-2'>Name</div>
                                 <input
                                     type="text"
                                     name="name"
-                                    placeholder="Nom"
+                                    placeholder="Name"
                                     className='input input-bordered w-full'
                                     value={formData.name}
                                     onChange={handleInputChange}
+                                    required
                                 />
                                 <div className='text-sm font-semibold mb-2'>Description</div>
                                 <textarea
@@ -136,11 +144,9 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
                                     className='textarea textarea-bordered w-full'
                                     value={formData.description}
                                     onChange={handleInputChange}
-                                >
-                                </textarea>
-
-
-                                <div className='text-sm font-semibold mb-2'>Catégorie</div>
+                                    required
+                                />
+                                <div className='text-sm font-semibold mb-2'>Category</div>
                                 <input
                                     type="text"
                                     name="categoryName"
@@ -149,68 +155,60 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
                                     onChange={handleInputChange}
                                     disabled
                                 />
-                                <div className='text-sm font-semibold mb-2'>Image / Prix Unitaire</div>
-
+                                <div className='text-sm font-semibold mb-2'>Image / Unit Price</div>
                                 <div className='flex'>
                                     <input
                                         type="file"
                                         accept='image/*'
-                                        placeholder="Prix"
                                         className='file-input file-input-bordered w-full'
                                         onChange={handleFileChange}
                                     />
-
                                     <input
                                         type="number"
                                         name="price"
-                                        placeholder="Prix"
+                                        placeholder="Price"
                                         className='input input-bordered w-full ml-4'
                                         value={formData.price}
                                         onChange={handleInputChange}
+                                        min="0"
+                                        step="0.01"
+                                        required
                                     />
                                 </div>
-
                                 <button type='submit' className='btn btn-primary mt-3'>
-                                    Mettre à jour
+                                    Update
                                 </button>
                             </form>
 
                             <div className='flex md:flex-col md:ml-4 mt-4 md:mt-0'>
-
-                                <div className='md:ml-4 md:w-[200px] mt-4 md:mt-0 border-2 border-primary md:h-[200px] p-5  justify-center items-center rounded-3xl hidden md:flex'>
-                                    {formData.imageUrl && formData.imageUrl !== "" ? (
-                                        <div>
-                                            <ProductImage
-                                                src={formData.imageUrl}
-                                                alt={product.name}
-                                                heightClass='h-40'
-                                                widthClass='w-40'
-                                            />
-                                        </div>
+                                <div className='md:ml-4 md:w-[200px] mt-4 md:mt-0 border-2 border-primary md:h-[200px] p-5 justify-center items-center rounded-3xl hidden md:flex'>
+                                    {formData.imageUrl ? (
+                                        <ProductImage
+                                            src={formData.imageUrl}
+                                            alt={product.name}
+                                            heightClass='h-40'
+                                            widthClass='w-40'
+                                        />
                                     ) : (
                                         <div className='wiggle-animation'>
                                             <FileImage strokeWidth={1} className='h-10 w-10 text-primary' />
                                         </div>
                                     )}
                                 </div>
-
                                 <div className='md:ml-4 w-full md:w-[200px] mt-4 border-2 border-primary md:h-[200px] p-5 flex justify-center items-center rounded-3xl md:mt-4'>
-                                    {previewUrl && previewUrl !== "" ? (
-                                        <div>
-                                            <ProductImage
-                                                src={previewUrl}
-                                                alt="preview"
-                                                heightClass='h-40'
-                                                widthClass='w-40'
-                                            />
-                                        </div>
+                                    {previewUrl ? (
+                                        <ProductImage
+                                            src={previewUrl}
+                                            alt="preview"
+                                            heightClass='h-40'
+                                            widthClass='w-40'
+                                        />
                                     ) : (
                                         <div className='wiggle-animation'>
                                             <FileImage strokeWidth={1} className='h-10 w-10 text-primary' />
                                         </div>
                                     )}
                                 </div>
-
                             </div>
                         </div>
                     </div>
@@ -219,7 +217,6 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
                         <span className="loading loading-spinner loading-xl"></span>
                     </div>
                 )}
-
             </div>
         </Wrapper>
     )

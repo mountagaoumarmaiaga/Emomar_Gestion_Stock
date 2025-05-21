@@ -1,15 +1,16 @@
 import { StockSummary } from '@/type'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { getStockSummary } from '../actions'
 import ProductImage from './ProductImage'
 import EmptyState from './EmptyState'
-import {  AlertCircle } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 
 const StockSummaryTable = ({ email }: { email: string }) => {
     const [data, setData] = useState<StockSummary | null>(null)
     const [loading, setLoading] = useState(true)
 
-    const fetchSummary = async () => {
+    // Utilisation de useCallback pour mémoriser la fonction
+    const fetchSummary = useCallback(async () => {
         try {
             setLoading(true)
             if (email) {
@@ -21,11 +22,11 @@ const StockSummaryTable = ({ email }: { email: string }) => {
         } finally {
             setLoading(false)
         }
-    }
+    }, [email]) // email est maintenant une dépendance
 
     useEffect(() => {
         if (email) fetchSummary()
-    }, [email])
+    }, [email, fetchSummary]) // Ajout de fetchSummary comme dépendance
 
     if (loading) return (
         <div className='flex justify-center items-center w-full h-64'>
@@ -35,9 +36,9 @@ const StockSummaryTable = ({ email }: { email: string }) => {
 
     if (!data) return (
         <EmptyState
-        message='Aucun produit disponible'
-        IconComponent='PackageSearch'
-    />
+            message='Aucun produit disponible'
+            IconComponent='PackageSearch'
+        />
     )
 
     return (
@@ -80,7 +81,6 @@ const StockSummaryTable = ({ email }: { email: string }) => {
                                     <th>Image</th>
                                     <th>Nom</th>
                                     <th>Quantité</th>
-                                    
                                 </tr>
                             </thead>
                             <tbody>
@@ -99,7 +99,6 @@ const StockSummaryTable = ({ email }: { email: string }) => {
                                         <td className={product.quantity === 0 ? 'text-error' : 'text-warning'}>
                                             {product.quantity}
                                         </td>
-                                       
                                     </tr>
                                 ))}
                             </tbody>
@@ -107,9 +106,9 @@ const StockSummaryTable = ({ email }: { email: string }) => {
                     </div>
                 ) : (
                     <EmptyState
-                            message='Aucun produit disponible'
-                            IconComponent='PackageSearch'
-                        />
+                        message='Aucun produit disponible'
+                        IconComponent='PackageSearch'
+                    />
                 )}
             </div>
         </div>

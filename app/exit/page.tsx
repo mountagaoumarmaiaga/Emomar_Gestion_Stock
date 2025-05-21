@@ -2,7 +2,7 @@
 
 import { OrderItem, Product } from '@/type'
 import { useUser } from '@clerk/nextjs'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { deductStockWithTransaction, readProducts } from '../actions'
 import Wrapper from '../components/Wrapper'
 import ProductComponent from '../components/ProductComponent'
@@ -12,7 +12,6 @@ import { Trash } from 'lucide-react'
 import { toast } from 'react-toastify'
 
 const Page = () => {
-
     const { user } = useUser()
     const email = user?.primaryEmailAddress?.emailAddress as string
     const [products, setProducts] = useState<Product[]>([])
@@ -20,8 +19,7 @@ const Page = () => {
     const [searchQuery, setSearchQuery] = useState<string>("")
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
 
-
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         try {
             if (email) {
                 const products = await readProducts(email)
@@ -32,12 +30,13 @@ const Page = () => {
         } catch (error) {
             console.error(error)
         }
-    }
+    }, [email])
 
     useEffect(() => {
-        if (email)
+        if (email) {
             fetchProducts()
-    }, [email])
+        }
+    }, [email, fetchProducts])
 
     const filteredAvailableProducts = products
         .filter((product) =>
@@ -69,7 +68,6 @@ const Page = () => {
                         name: product.name,
                         availableQuantity: product.quantity,
                     }
-
                 ]
             }
 
@@ -100,10 +98,9 @@ const Page = () => {
         })
     }
 
-
     const handleSubmit = async () => {
         try {
-            if (order.length == 0) {
+            if (order.length === 0) {
                 toast.error("Veuillez ajouter des produits à la commande.")
                 return
             }
@@ -113,7 +110,7 @@ const Page = () => {
                 toast.success("Don confirmé avec succès !")
                 setOrder([])
                 setSelectedProductIds([])
-                fetchProducts();
+                fetchProducts()
             } else {
                 toast.error(`${response?.message}`)
             }
@@ -121,7 +118,6 @@ const Page = () => {
             console.error(error)
         }
     }
-
 
     return (
         <Wrapper>
@@ -219,7 +215,7 @@ const Page = () => {
                     )}
                 </div>
             </div>
-        </Wrapper >
+        </Wrapper>
     )
 }
 

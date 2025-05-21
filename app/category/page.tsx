@@ -1,5 +1,5 @@
 "use client"
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import Wrapper from '../components/Wrapper'
 import CategoryModal from '../components/CategoryModal'
 import { useUser } from '@clerk/nextjs'
@@ -20,16 +20,18 @@ const Page = () => {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
 
-  const loadCategories = async () => {
+  // Utilisation de useCallback pour mémoriser la fonction
+  const loadCategories = useCallback(async () => {
     if (email) {
       const data = await readCategories(email)
       if (data)
         setCategories(data)
     }
-  }
+  }, [email]) // email est maintenant une dépendance
+
   useEffect(() => {
     loadCategories()
-  }, [email])
+  }, [loadCategories]) // Utilisation de la fonction mémorisée comme dépendance
 
   const openCreateModal = () => {
     setName("");
@@ -76,7 +78,6 @@ const Page = () => {
     (document.getElementById("category_modal") as HTMLDialogElement)?.showModal()
   }
 
-
   const handleDeleteCategory = async (categoryId: string) => {
     const confirmDelete = confirm("Voulez-vous vraiment supprimer cette catégorie ? Tous les produits associés seront également supprimés")
     if (!confirmDelete) return;
@@ -85,10 +86,8 @@ const Page = () => {
     toast.success("Catégorie supprimée avec succès.")
   }
 
-
   return (
     <Wrapper>
-
       <div>
         <div className='mb-4'>
           <button className='btn btn-primary'
@@ -97,7 +96,6 @@ const Page = () => {
             Ajouter une catégorie
           </button>
         </div>
-
 
         {categories.length > 0 ? (
           <div>
@@ -136,7 +134,6 @@ const Page = () => {
         onSubmit={editMode ? handleUpdateCategory : handleCreateCategory}
         editMode={editMode}
       />
-
     </Wrapper>
   )
 }

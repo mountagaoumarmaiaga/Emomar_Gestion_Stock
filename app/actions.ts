@@ -2,7 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { FormDataType, OrderItem, Product, ProductOverviewStats, StockSummary, Transaction } from "@/type"
-import { Category} from "@prisma/client"
+import { Category, Prisma} from "@prisma/client"
 
 
 export async function checkAndAddentreprise(email: string, name: string) {
@@ -229,8 +229,8 @@ export async function deleteProduct(id: string, email: string) {
 export async function readProducts(
     email: string,
     filters?: {
-        searchName?: string;   // Recherche par nom de produit (sensible à la casse)
-        categoryId?: string;   // Filtre par ID de catégorie
+        searchName?: string;
+        categoryId?: string;
     }
 ): Promise<Product[] | undefined> {
     try {
@@ -243,21 +243,19 @@ export async function readProducts(
             throw new Error("Aucune entreprise trouvée avec cet email.");
         }
 
-        // Construction du filtre de base
-        const whereClause: any = {
+        // Construction du filtre avec un type précis
+        const whereClause: Prisma.ProductWhereInput = {
             entrepriseId: entreprise.id,
+            ...(filters?.searchName && {
+                name: { 
+                    contains: filters.searchName,
+                    mode: 'insensitive' // Optionnel : pour rendre la recherche insensible à la casse
+                }
+            }),
+            ...(filters?.categoryId && {
+                categoryId: filters.categoryId
+            })
         };
-
-        // Ajout des filtres optionnels
-        if (filters?.searchName) {
-            whereClause.name = { 
-                contains: filters.searchName // Recherche sensible à la casse
-            };
-        }
-
-        if (filters?.categoryId) {
-            whereClause.categoryId = filters.categoryId;
-        }
 
         const products = await prisma.product.findMany({
             where: whereClause,

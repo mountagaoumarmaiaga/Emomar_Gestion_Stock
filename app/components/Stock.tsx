@@ -1,12 +1,11 @@
 import { Product } from '@/type'
 import { useUser } from '@clerk/nextjs'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { readProducts, replenishStockWithTransaction } from '../actions'
 import ProductComponent from './ProductComponent'
 import { toast } from 'react-toastify'
 
 const Stock = () => {
-
     const { user } = useUser()
     const email = user?.primaryEmailAddress?.emailAddress as string
     const [products, setProducts] = useState<Product[]>([])
@@ -14,8 +13,7 @@ const Stock = () => {
     const [quantity, setQuantity] = useState<number>(0)
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
 
-
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
         try {
             if (email) {
                 const products = await readProducts(email)
@@ -26,13 +24,13 @@ const Stock = () => {
         } catch (error) {
             console.error(error)
         }
-    }
-
-    useEffect(() => {
-        if (email)
-            fetchProducts()
     }, [email])
 
+    useEffect(() => {
+        if (email) {
+            fetchProducts()
+        }
+    }, [email, fetchProducts])
 
     const handleProductChange = (productId: string) => {
         const product = products.find((p) => p.id === productId)
@@ -41,44 +39,54 @@ const Stock = () => {
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+        e.preventDefault()
         if (!selectedProductId || quantity <= 0) {
             toast.error("Veuillez sélectionner un produit et entrer une quantité valide.")
             return
         }
         try {
-            if(email){
-                await replenishStockWithTransaction(selectedProductId , quantity , email)
+            if (email) {
+                await replenishStockWithTransaction(selectedProductId, quantity, email)
             }
             toast.success("Le stock a été réapprovisionné avec succès.")
             fetchProducts()
             setSelectedProductId('')
             setQuantity(0)
             setSelectedProduct(null)
-            const modal = ( document.getElementById("my_modal_stock") as HTMLDialogElement)
-            if(modal){
+            const modal = document.getElementById("my_modal_stock") as HTMLDialogElement
+            if (modal) {
                 modal.close()
             }
         } catch (error) {
             console.error(error)
+            toast.error("Une erreur est survenue lors du réapprovisionnement du stock.")
         }
     }
 
     return (
         <div>
-            {/* You can open the modal using document.getElementById('ID').showModal() method */}
+            <button 
+                className="btn btn-primary"
+                onClick={() => {
+                    const modal = document.getElementById("my_modal_stock") as HTMLDialogElement
+                    if (modal) {
+                        modal.showModal()
+                    }
+                }}
+            >
+                Gérer le stock
+            </button>
 
             <dialog id="my_modal_stock" className="modal">
                 <div className="modal-box">
                     <form method="dialog">
-                        {/* if there is a button in form, it will close the modal */}
                         <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
                     </form>
                     <h3 className="font-bold text-lg">Gestion du stock</h3>
                     <p className="py-4">Ajoutez des quantités aux produits disponibles dans votre stock.</p>
 
                     <form className='space-y-2' onSubmit={handleSubmit}>
-                        <label className='block' >Sélectionner un produit</label>
+                        <label className='block'>Sélectionner un produit</label>
                         <select
                             value={selectedProductId}
                             className='select select-bordered w-full'
@@ -93,28 +101,26 @@ const Stock = () => {
                                     {product.name} - {product.categoryName}
                                 </option>
                             ))}
-
                         </select>
 
                         {selectedProduct && (
                             <ProductComponent product={selectedProduct} />
                         )}
 
-                        <label className='block' >Quantité à ajouter</label>
-
+                        <label className='block'>Quantité à ajouter</label>
                         <input
                             type="number"
                             placeholder='Quantité à ajouter'
                             value={quantity}
                             required
+                            min="1"
                             onChange={(e) => setQuantity(Number(e.target.value))}
                             className='input input-bordered w-full'
-
                         />
+
                         <button type="submit" className='btn btn-primary w-fit'>
                             Ajouter au stock
                         </button>
-
                     </form>
                 </div>
             </dialog>
