@@ -65,17 +65,7 @@ const Stock = () => {
 
     return (
         <div>
-            <button 
-                className="btn btn-primary"
-                onClick={() => {
-                    const modal = document.getElementById("my_modal_stock") as HTMLDialogElement
-                    if (modal) {
-                        modal.showModal()
-                    }
-                }}
-            >
-                Gérer le stock
-            </button>
+            
 
             <dialog id="my_modal_stock" className="modal">
                 <div className="modal-box">
