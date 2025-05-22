@@ -23,3 +23,18 @@
   --toastify-color-light: #ECE3CA;
   --toastify-text-color-light: #793205;
 }
+:root {
+  --font-geist-sans: -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@supports (font-variation-settings: normal) {
+  :root {
+    --font-geist-sans: 'Geist Sans Variable', sans-serif;
+    --font-geist-mono: 'Geist Mono Variable', monospace;
+  }
+}
+
+body {
+  font-feature-settings: 'rlig' 1, 'calt' 1;
+}

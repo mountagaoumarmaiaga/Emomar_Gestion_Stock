@@ -107,7 +107,7 @@ const Page = () => {
             const response = await deductStockWithTransaction(order, email)
 
             if (response?.success) {
-                toast.success("Don confirmé avec succès !")
+                toast.success("Sortie confirmé avec succès !")
                 setOrder([])
                 setSelectedProductIds([])
                 fetchProducts()
@@ -204,7 +204,7 @@ const Page = () => {
                                 onClick={handleSubmit}
                                 className='btn btn-primary mt-4 w-fit '
                             >
-                                Confirmer le Don
+                                Confirmer le Sortie
                             </button>
                         </>
                     ) : (
