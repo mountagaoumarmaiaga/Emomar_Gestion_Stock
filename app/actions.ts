@@ -234,42 +234,49 @@ export async function readProducts(
     }
 ): Promise<Product[] | undefined> {
     try {
-        if (!email) {
-            throw new Error("L'email est requis pour la lecture.");
-        }
+        if (!email) throw new Error("Email required")
 
-        const entreprise = await getEntreprise(email);
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        const entreprise = await prisma.entreprise.findUnique({
+            where: { email }
+        })
 
-        const whereClause: Prisma.ProductWhereInput = {
+        if (!entreprise) throw new Error("Entreprise not found")
+
+        const where: Prisma.ProductWhereInput = {
             entrepriseId: entreprise.id,
-            ...(filters?.searchName && {
-                name: { 
-                    contains: filters.searchName,
-                    mode: 'insensitive'
-                }
-            }),
-            ...(filters?.categoryId && {
-                categoryId: filters.categoryId
-            })
-        };
+            AND: [
+                filters?.searchName ? {
+                    name: { 
+                        contains: filters.searchName,
+                        mode: 'insensitive'
+                    }
+                } : {},
+                filters?.categoryId ? {
+                    category: {
+                        name: filters.categoryId
+                    }
+                } : {}
+            ]
+        }
 
         const products = await prisma.product.findMany({
-            where: whereClause,
+            where,
             include: {
-                category: true,
+                category: true
+            },
+            orderBy: {
+                createdAt: 'desc'
             }
-        });
+        })
 
         return products.map(product => ({
             ...product,
-            categoryName: product.category?.name
-        }));
+            categoryName: product.category?.name || 'Sans catégorie'
+        }))
+
     } catch (error) {
-        console.error(error);
-        return undefined;
+        console.error("Error in readProducts:", error)
+        throw error
     }
 }
 

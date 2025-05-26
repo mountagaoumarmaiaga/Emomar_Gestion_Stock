@@ -10,71 +10,74 @@ import Link from 'next/link'
 import { Trash, Search } from 'lucide-react'
 import { toast } from 'react-toastify'
 
-const Page = () => {
+const ProductsPage = () => {
     const { user } = useUser()
     const email = user?.primaryEmailAddress?.emailAddress as string
     const [products, setProducts] = useState<Product[]>([])
-    const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
     const [searchTerm, setSearchTerm] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('')
+    const [isLoading, setIsLoading] = useState(true)
 
-    // Récupérer les produits avec filtres
+    // Fetch products with filters
     const fetchProducts = useCallback(async () => {
         try {
-            if (email) {
-                const products = await readProducts(email, {
-                    searchName: searchTerm,
-                    categoryId: categoryFilter
-                })
-                if (products) {
-                    setProducts(products)
-                    setFilteredProducts(products)
-                }
+            setIsLoading(true)
+            if (!email) return
+            
+            const result = await readProducts(email, {
+                searchName: searchTerm,
+                categoryId: categoryFilter
+            })
+            
+            if (result) {
+                setProducts(result)
             }
         } catch (error) {
-            console.error(error)
+            console.error('Failed to fetch products:', error)
+            toast.error('Échec du chargement des produits')
+        } finally {
+            setIsLoading(false)
         }
-    }, [email, searchTerm, categoryFilter]) // All dependencies declared
+    }, [email, searchTerm, categoryFilter])
 
     useEffect(() => {
-        if (email) {
-            fetchProducts()
-        }
-    }, [email, searchTerm, categoryFilter, fetchProducts]) // All dependencies declared
+        fetchProducts()
+    }, [fetchProducts])
 
-    const handleDeleteProduct = async (product: Product) => {
-        const confirmDelete = confirm("Voulez-vous vraiment supprimer ce produit ?")
-        if (!confirmDelete) return;
+    const handleDelete = async (product: Product) => {
+        if (!confirm('Voulez-vous vraiment supprimer ce produit ?')) return
+        
         try {
+            // Delete image if exists
             if (product.imageUrl) {
-                const resDelete = await fetch("/api/upload", {
-                    method: "DELETE",
+                const res = await fetch('/api/upload', {
+                    method: 'DELETE',
                     body: JSON.stringify({ path: product.imageUrl }),
                     headers: { 'Content-Type': 'application/json' }
                 })
-                const dataDelete = await resDelete.json()
-                if (!dataDelete.success) {
-                    throw new Error("Erreur lors de la suppression de l'image.")
-                } else {
-                    if (email) {
-                        await deleteProduct(product.id, email)
-                        await fetchProducts()
-                        toast.success("Produit supprimé avec succès")
-                    }
-                }
+                
+                if (!res.ok) throw new Error('Failed to delete image')
+            }
+
+            // Delete product
+            if (email) {
+                await deleteProduct(product.id, email)
+                toast.success('Produit supprimé avec succès')
+                await fetchProducts()
             }
         } catch (error) {
-            console.error(error)
-            toast.error("Erreur lors de la suppression du produit")
+            console.error('Delete failed:', error)
+            toast.error('Échec de la suppression du produit')
         }
     }
 
-    // Extraire les catégories uniques pour le filtre
-    const categories = [...new Set(products.map(p => p.categoryName))]
+    // Get unique categories for filter dropdown
+    const categories = Array.from(new Set(products.map(p => p.categoryName)))
 
     return (
         <Wrapper>
             <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+                {/* Search Input */}
                 <div className="relative w-full md:w-1/2">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Search className="h-5 w-5 text-gray-400" />
@@ -88,6 +91,7 @@ const Page = () => {
                     />
                 </div>
                 
+                {/* Category Filter */}
                 <select
                     className="select select-bordered w-full md:w-1/3"
                     value={categoryFilter}
@@ -102,19 +106,22 @@ const Page = () => {
                 </select>
             </div>
 
+            {/* Products Table */}
             <div className='overflow-x-auto'>
-                {filteredProducts.length === 0 ? (
-                    <div>
-                        <EmptyState
-                            message='Aucun produit disponible'
-                            IconComponent='PackageSearch'
-                        />
+                {isLoading ? (
+                    <div className="flex justify-center">
+                        <span className="loading loading-spinner loading-lg"></span>
                     </div>
+                ) : products.length === 0 ? (
+                    <EmptyState
+                        message='Aucun produit disponible'
+                        IconComponent='PackageSearch'
+                    />
                 ) : (
                     <table className='table'>
                         <thead>
                             <tr>
-                                <th></th>
+                                <th>#</th>
                                 <th>Image</th>
                                 <th>Nom</th>
                                 <th>Description</th>
@@ -125,29 +132,33 @@ const Page = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredProducts.map((product, index) => (
+                            {products.map((product, index) => (
                                 <tr key={product.id}>
-                                    <th>{index + 1}</th>
+                                    <td>{index + 1}</td>
                                     <td>
                                         <ProductImage
                                             src={product.imageUrl}
-                                            alt={product.imageUrl}
+                                            alt={product.name}
                                             heightClass='h-12'
                                             widthClass='w-12'
                                         />
                                     </td>
                                     <td>{product.name}</td>
-                                    <td>{product.description}</td>
+                                    <td className="max-w-xs truncate">{product.description}</td>
                                     <td>{product.price} XOF</td>
-                                    <td className='capitalize'>
-                                        {product.quantity} {product.unit}
-                                    </td>
+                                    <td>{product.quantity} {product.unit}</td>
                                     <td>{product.categoryName}</td>
-                                    <td className='flex gap-2 flex-col'>
-                                        <Link className='btn btn-xs w-fit btn-primary' href={`/update-product/${product.id}`}>
+                                    <td className='flex gap-2'>
+                                        <Link 
+                                            href={`/update-product/${product.id}`}
+                                            className='btn btn-xs btn-primary'
+                                        >
                                             Modifier
                                         </Link>
-                                        <button className='btn btn-xs w-fit' onClick={() => handleDeleteProduct(product)}>
+                                        <button 
+                                            onClick={() => handleDelete(product)}
+                                            className='btn btn-xs btn-error'
+                                        >
                                             <Trash className='w-4 h-4' />
                                         </button>
                                     </td>
@@ -161,4 +172,4 @@ const Page = () => {
     )
 }
 
-export default Page
+export default ProductsPage
