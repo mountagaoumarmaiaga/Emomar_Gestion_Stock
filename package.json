@@ -4,12 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.19.5",
+    "@neondatabase/serverless": "^1.0.0",
+    "@prisma/adapter-neon": "^6.8.2",
+    "@prisma/adapter-pg": "^6.8.2",
     "@prisma/client": "^6.8.2",
     "geist": "^1.4.2",
     "lucide-react": "^0.488.0",
@@ -17,7 +21,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-toastify": "^11.0.5",
-    "recharts": "^2.15.3"
+    "recharts": "^2.15.3",
+    "ws": "^8.18.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -25,6 +30,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.1",
     "daisyui": "^5.0.23",
     "eslint": "^9",
     "eslint-config-next": "15.3.0",

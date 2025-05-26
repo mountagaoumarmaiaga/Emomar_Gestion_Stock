@@ -243,13 +243,12 @@ export async function readProducts(
             throw new Error("Aucune entreprise trouvée avec cet email.");
         }
 
-        // Construction du filtre avec un type précis
         const whereClause: Prisma.ProductWhereInput = {
             entrepriseId: entreprise.id,
             ...(filters?.searchName && {
                 name: { 
                     contains: filters.searchName,
-                    mode: 'insensitive' // Optionnel : pour rendre la recherche insensible à la casse
+                    mode: 'insensitive'
                 }
             }),
             ...(filters?.categoryId && {
@@ -273,8 +272,6 @@ export async function readProducts(
         return undefined;
     }
 }
-  
-  
 
 export async function readProductById(productId: string, email: string): Promise<Product | undefined> {
     try {
@@ -576,10 +573,9 @@ export async function getStockSummary(email: string): Promise<StockSummary> {
             }
         });
 
-        // Définition des seuils de stock
-        const IN_STOCK_MIN = 20; // Seuil modifiable selon vos besoins
+        const IN_STOCK_MIN = 20;
         const inStock = allProducts.filter((p) => p.quantity > IN_STOCK_MIN);
-        const lowStock = allProducts.filter((p) => p.quantity > 0 && p.quantity <= IN_STOCK_MIN); // Correction ici
+        const lowStock = allProducts.filter((p) => p.quantity > 0 && p.quantity <= IN_STOCK_MIN);
         const outOfStock = allProducts.filter((p) => p.quantity === 0);
         const criticalProducts = [...lowStock, ...outOfStock];
 
@@ -591,8 +587,8 @@ export async function getStockSummary(email: string): Promise<StockSummary> {
                 id: p.id,
                 name: p.name,
                 quantity: p.quantity,
-                categoryName: p.category?.name || "Non catégorisé", // Gestion du cas undefined
-                imageUrl: p.imageUrl // Ajout des champs nécessaires à l'UI
+                categoryName: p.category?.name || "Non catégorisé",
+                imageUrl: p.imageUrl
             }))
         };
 
