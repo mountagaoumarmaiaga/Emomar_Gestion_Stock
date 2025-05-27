@@ -43,27 +43,29 @@ const StockSummaryTable = ({ email }: { email: string }) => {
 
     return (
         <div className='w-full'>
-            {/* Ancien design des étapes */}
-            <ul className="steps steps-vertical lg:steps-horizontal border-2 border-base-200 w-full p-4 rounded-3xl">
-                <li className="step step-primary">
-                    <div className='flex items-center gap-2'>
-                        <span className='text-sm font-bold'>Stock normal</span>
-                        <span className='badge badge-success'>{data.inStockCount}</span>
-                    </div>
-                </li>
-                <li className="step step-primary">
-                    <div className='flex items-center gap-2'>
-                        <span className='text-sm font-bold'>Stock faible (≤ 20)</span>
-                        <span className='badge badge-warning'>{data.lowStockCount}</span>
-                    </div>
-                </li>
-                <li className="step step-primary">
-                    <div className='flex items-center gap-2'>
-                        <span className='text-sm font-bold'>Rupture</span>
-                        <span className='badge badge-error'>{data.outOfStockCount}</span>
-                    </div>
-                </li>
-            </ul>
+
+        <ul className="steps steps-vertical border-2 border-base-200 w-full p-4 rounded-3xl">
+            <li className="step step-primary">
+                <div>
+                    <span className='text-sm mr-4 font-bold '>Stock normal</span>
+                    <div className='badge badge-soft badge-success'>{data.inStockCount}</div>
+                </div>
+            </li>
+            <li className="step step-primary">
+                <div>
+                    <span className='text-sm mr-4 font-bold '>Stock faible (≤ 2)</span>
+                    <div className='badge badge-soft badge-warning font-bold'>{data.lowStockCount}</div>
+                </div>
+            </li>
+
+            <li className="step step-primary">
+                <div>
+                    <span className='text-sm mr-4 font-bold '>Rupture</span>
+                    <div className='badge badge-soft badge-error font-bold'>{data.outOfStockCount}</div>
+                </div>
+            </li>
+
+        </ul>
 
             {/* Section des produits critiques */}
             <div className='border-2 border-base-200 w-full p-4 rounded-3xl mt-4'>

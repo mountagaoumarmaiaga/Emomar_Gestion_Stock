@@ -355,33 +355,53 @@ export async function replenishStockWithTransaction(productId: string, quantity:
     }
 }
 
-export async function deductStockWithTransaction(orderItems: OrderItem[], email: string) {
+export async function deductStockWithTransaction(
+    orderItems: OrderItem[], 
+    email: string,
+    destinationId?: string
+) {
     try {
-
         if (!email) {
-            throw new Error("l'email est requis .")
+            throw new Error("L'email est requis.");
         }
 
-        const entreprise = await getEntreprise(email)
+        const entreprise = await getEntreprise(email);
         if (!entreprise) {
             throw new Error("Aucune entreprise trouvée avec cet email.");
         }
 
+        // Vérification de la destination
+        if (destinationId) {
+            const destinationExists = await prisma.destination.findUnique({
+                where: { 
+                    id: destinationId,
+                    entrepriseId: entreprise.id
+                }
+            });
+            if (!destinationExists) {
+                throw new Error("Destination invalide ou non autorisée.");
+            }
+        }
+
+        // Validation des produits
         for (const item of orderItems) {
             const product = await prisma.product.findUnique({
-                where: { id: item.productId }
-            })
+                where: { 
+                    id: item.productId,
+                    entrepriseId: entreprise.id
+                }
+            });
 
             if (!product) {
-                throw new Error(`Produit avec l'ID ${item.productId} introuvable.`)
+                throw new Error(`Produit avec l'ID ${item.productId} introuvable.`);
             }
 
             if (item.quantity <= 0) {
-                throw new Error(`La quantité demandée pour "${product.name}" doit être supérieure à zéro.`)
+                throw new Error(`La quantité pour "${product.name}" doit être > 0.`);
             }
 
             if (product.quantity < item.quantity) {
-                throw new Error(`Le produit "${product.name}" n'a pas assez de stock. Demandé: ${item.quantity}, Disponible: ${product.quantity} / ${product.unit}.`)
+                throw new Error(`Stock insuffisant pour "${product.name}".`);
             }
         }
 
@@ -393,71 +413,104 @@ export async function deductStockWithTransaction(orderItems: OrderItem[], email:
                         entrepriseId: entreprise.id
                     },
                     data: {
-                        quantity: {
-                            decrement: item.quantity,
-                        }
+                        quantity: { decrement: item.quantity }
                     }
                 });
+
                 await tx.transaction.create({
                     data: {
                         type: "OUT",
                         quantity: item.quantity,
                         productId: item.productId,
-                        entrepriseId: entreprise.id
+                        entrepriseId: entreprise.id,
+                        ...(destinationId && { destinationId }) // Conditionally add destinationId
                     }
-                })
+                });
             }
+        });
 
-        })
-
-        return { success: true }
+        return { success: true };
     } catch (error) {
-        console.error(error)
-        return { success: false, message: error }
+        console.error(error);
+        return { 
+            success: false, 
+            message: error instanceof Error ? error.message : "Erreur inconnue" 
+        };
     }
 }
 
-export async function getTransactions(email: string, limit?: number): Promise<Transaction[]> {
-    try {
-        if (!email) {
-            throw new Error("l'email est requis .")
+export async function getTransactions(
+    email: string, 
+    options?: {
+        limit?: number
+        filters?: {
+            productId?: string
+            dateFrom?: Date
+            dateTo?: Date
+            type?: 'IN' | 'OUT'
         }
+    }
+): Promise<Transaction[]> {
+    try {
+        if (!email) throw new Error("Email requis")
 
-        const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
+        const entreprise = await prisma.entreprise.findUnique({
+            where: { email }
+        })
+        if (!entreprise) throw new Error("Entreprise non trouvée")
+
+        const where: Prisma.TransactionWhereInput = {
+            entrepriseId: entreprise.id,
+            AND: [
+                options?.filters?.productId ? { productId: options.filters.productId } : {},
+                options?.filters?.dateFrom ? { createdAt: { gte: options.filters.dateFrom } } : {},
+                options?.filters?.dateTo ? { createdAt: { lte: options.filters.dateTo } } : {},
+                options?.filters?.type ? { type: options.filters.type } : {}
+            ]
         }
 
         const transactions = await prisma.transaction.findMany({
-            where: {
-                entrepriseId: entreprise.id
-            },
-            orderBy: {
-                createdAt: "desc"
-            },
-            take: limit,
+            where,
+            orderBy: { createdAt: "desc" },
+            take: options?.limit,
             include: {
                 product: {
-                    include: {
-                        category: true
-                    }
-                }
+                    include: { category: true }
+                },
+                destination: true
             }
         })
 
-        return transactions.map((tx) => ({
-            ...tx,
-            categoryName: tx.product.category.name,
-            productName: tx.product.name,
-            imageUrl: tx.product.imageUrl,
-            price: tx.product.price,
-            unit: tx.product.unit,
-        }))
+        return transactions.map(tx => {
+            const transaction: Transaction = {
+                id: tx.id,
+                type: tx.type as 'IN' | 'OUT',
+                quantity: tx.quantity,
+                productId: tx.productId,
+                entrepriseId: tx.entrepriseId,
+                destinationId: tx.destinationId,
+                createdAt: tx.createdAt,
+                categoryName: tx.product.category.name,
+                productName: tx.product.name,
+                imageUrl: tx.product.imageUrl,
+                price: tx.product.price,
+                unit: tx.product.unit,
+                destination: tx.destination ? {
+                    id: tx.destination.id,
+                    name: tx.destination.name,
+                    description: tx.destination.description ?? null,
+                    entrepriseId: tx.destination.entrepriseId ?? null
+                } : undefined
+            }
+            return transaction
+        })
+
     } catch (error) {
-        console.error(error)
-        return []
+        console.error("Error in getTransactions:", error)
+        throw error
     }
 }
+
 
 export async function getProductOverviewStats(email: string): Promise<ProductOverviewStats> {
     try {

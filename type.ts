@@ -1,9 +1,7 @@
-import { Product as PrismaProduct } from "@prisma/client"
-import { Transaction as PrismaTransaction } from "@prisma/client"
+import { Product as PrismaProduct, Transaction as PrismaTransaction, Destination as PrismaDestination } from "@prisma/client"
 
 export interface Product extends PrismaProduct {
     categoryName: string;
-
 }
 
 export interface FormDataType {
@@ -27,12 +25,22 @@ export interface OrderItem {
     availableQuantity: number;
 };
 
+export interface Destination extends PrismaDestination {
+    transactionCount?: number;
+}
+
 export interface Transaction extends PrismaTransaction {
     categoryName: string;
     productName: string;
     imageUrl?: string;
     price: number;
     unit: string;
+    destination?: {
+        id: string;
+        name: string;
+        description: string | null;
+        entrepriseId?: string | null;
+    };
 }
 
 export interface ProductOverviewStats {
@@ -55,12 +63,18 @@ interface CriticalProduct {
     imageUrl?: string;
     unit?: string;
     lastRestocked?: Date; 
-  }
+}
   
-  export interface StockSummary {
+export interface StockSummary {
     inStockCount: number;
     lowStockCount: number; 
     outOfStockCount: number;
     criticalProducts: CriticalProduct[];
     healthPercentage?: number;
-  }
+}
+
+export interface DestinationOption {
+    value: string;
+    label: string;
+    description?: string;
+}

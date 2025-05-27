@@ -1,4 +1,5 @@
 "use client"
+
 import { Product, Transaction } from '@/type'
 import { useUser } from '@clerk/nextjs'
 import React, { useEffect, useState, useCallback } from 'react'
@@ -10,7 +11,7 @@ import { RotateCcw } from 'lucide-react'
 
 const ITEMS_PER_PAGE = 5
 
-const Page = () => {
+const TransactionsPage = () => {
     const { user } = useUser()
     const email = user?.primaryEmailAddress?.emailAddress as string
     const [products, setProducts] = useState<Product[]>([])
@@ -20,17 +21,23 @@ const Page = () => {
     const [dateTo, setDateTo] = useState<string>("")
     const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([])
     const [currentPage, setCurrentPage] = useState<number>(1)
+    const [isLoading, setIsLoading] = useState(false)
 
     const fetchData = useCallback(async () => {
+        setIsLoading(true)
         try {
             if (email) {
-                const products = await readProducts(email)
-                const txs = await getTransactions(email)
-                if (products) setProducts(products)
-                if (txs) setTransactions(txs)
+                const [productsData, transactionsData] = await Promise.all([
+                    readProducts(email),
+                    getTransactions(email)
+                ])
+                if (productsData) setProducts(productsData)
+                if (transactionsData) setTransactions(transactionsData)
             }
         } catch (error) {
-            console.error(error)
+            console.error("Error fetching data:", error)
+        } finally {
+            setIsLoading(false)
         }
     }, [email])
 
@@ -42,13 +49,13 @@ const Page = () => {
         let filtered = transactions
 
         if (selectedProduct) {
-            filtered = filtered.filter((tx) => tx.productId === selectedProduct.id)
+            filtered = filtered.filter(tx => tx.productId === selectedProduct.id)
         }
         if (dateFrom) {
-            filtered = filtered.filter((tx) => new Date(tx.createdAt) >= new Date(dateFrom))
+            filtered = filtered.filter(tx => new Date(tx.createdAt) >= new Date(dateFrom))
         }
         if (dateTo) {
-            filtered = filtered.filter((tx) => new Date(tx.createdAt) <= new Date(dateTo))
+            filtered = filtered.filter(tx => new Date(tx.createdAt) <= new Date(dateTo))
         }
 
         setFilteredTransactions(filtered)
@@ -59,98 +66,132 @@ const Page = () => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
     const currentTransactions = filteredTransactions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
+    const resetFilters = () => {
+        setSelectedProduct(null)
+        setDateFrom("")
+        setDateTo("")
+    }
+
     return (
         <Wrapper>
-            <div className='flex justify-between items-center flex-wrap gap-4'>
-                <div className='flex md:justify-between w-full mb-4 space-x-2 md:space-x-0'>
-                    <div>
-                        <select
-                            className='select select-bordered md:w-64'
-                            value={selectedProduct?.id || ""}
-                            onChange={(e) => {
-                                const product = products.find((p) => p.id === e.target.value) || null
-                                setSelectedProduct(product)
-                            }}
+            <div className="space-y-6">
+                <div className="flex flex-col md:flex-row justify-between gap-4">
+                    <h1 className="text-2xl font-bold">Historique des Transactions</h1>
+                    
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={fetchData}
+                            className="btn btn-outline"
+                            disabled={isLoading}
                         >
-                            <option value="">Tous les produits</option>
-                            {products.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                    {p.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className='flex items-center space-x-2'>
-                        <input
-                            type="text"
-                            placeholder='Date de Début'
-                            className='input input-bordered'
-                            value={dateFrom}
-                            onFocus={(e) => e.target.type = "date"}
-                            onBlur={(e) => {
-                                if (!e.target.value) e.target.type = "text"
-                            }}
-                            onChange={(e) => setDateFrom(e.target.value)}
-                        />
-
-                        <input
-                            type="text"
-                            placeholder='Date de Fin'
-                            className='input input-bordered'
-                            value={dateTo}
-                            onFocus={(e) => e.target.type = "date"}
-                            onBlur={(e) => {
-                                if (!e.target.value) e.target.type = "text"
-                            }}
-                            onChange={(e) => setDateTo(e.target.value)}
-                        />
-
-                        <button
-                            className='btn btn-primary'
-                            onClick={() => {
-                                setSelectedProduct(null)
-                                setDateTo("")
-                                setDateFrom("")
-                            }}
-                        >
-                            <RotateCcw className='w-4 h-4' />
+                            {isLoading ? 'Chargement...' : 'Rafraîchir'}
                         </button>
                     </div>
                 </div>
 
-                {transactions.length === 0 ? (
+                <div className="card bg-base-100 shadow">
+                    <div className="card-body">
+                        <div className="flex flex-col md:flex-row gap-4">
+                            <div className="flex-1">
+                                <label className="label">
+                                    <span className="label-text">Filtrer par produit</span>
+                                </label>
+                                <select
+                                    className="select select-bordered w-full"
+                                    value={selectedProduct?.id || ""}
+                                    onChange={(e) => {
+                                        const product = products.find(p => p.id === e.target.value) || null
+                                        setSelectedProduct(product)
+                                    }}
+                                    disabled={isLoading}
+                                >
+                                    <option value="">Tous les produits</option>
+                                    {products.map((product) => (
+                                        <option key={product.id} value={product.id}>
+                                            {product.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex-1">
+                                <label className="label">
+                                    <span className="label-text">Période</span>
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Date de début"
+                                        className="input input-bordered flex-1"
+                                        value={dateFrom}
+                                        onFocus={(e) => e.target.type = "date"}
+                                        onBlur={(e) => !e.target.value && (e.target.type = "text")}
+                                        onChange={(e) => setDateFrom(e.target.value)}
+                                        disabled={isLoading}
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Date de fin"
+                                        className="input input-bordered flex-1"
+                                        value={dateTo}
+                                        onFocus={(e) => e.target.type = "date"}
+                                        onBlur={(e) => !e.target.value && (e.target.type = "text")}
+                                        onChange={(e) => setDateTo(e.target.value)}
+                                        disabled={isLoading}
+                                    />
+                                    <button
+                                        className="btn btn-outline"
+                                        onClick={resetFilters}
+                                        disabled={isLoading}
+                                    >
+                                        <RotateCcw size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {isLoading ? (
+                    <div className="flex justify-center py-8">
+                        <span className="loading loading-spinner loading-lg"></span>
+                    </div>
+                ) : filteredTransactions.length === 0 ? (
                     <EmptyState
-                        message='Aucune Transaction pour le moment'
-                        IconComponent='CaptionsOff'
+                        message={transactions.length === 0 
+                            ? "Aucune transaction trouvée" 
+                            : "Aucune transaction ne correspond aux filtres"}
+                        IconComponent="ListTodo"
                     />
                 ) : (
-                    <div className='space-y-4 w-full'>
+                    <div className="space-y-4">
                         {currentTransactions.map((tx) => (
                             <TransactionComponent key={tx.id} tx={tx} />
                         ))}
-                    </div>
-                )}
 
-                {filteredTransactions.length > ITEMS_PER_PAGE && (
-                    <div className="join">
-                        <button
-                            className="join-item btn"
-                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                        >
-                            «
-                        </button>
-                        <button className="join-item btn">
-                            Page {currentPage}
-                        </button>
-                        <button
-                            className="join-item btn"
-                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                            disabled={currentPage === totalPages}
-                        >
-                            »
-                        </button>
+                        {totalPages > 1 && (
+                            <div className="flex justify-center mt-6">
+                                <div className="join">
+                                    <button
+                                        className="join-item btn"
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1 || isLoading}
+                                    >
+                                        «
+                                    </button>
+                                    <button className="join-item btn">
+                                        Page {currentPage} sur {totalPages}
+                                    </button>
+                                    <button
+                                        className="join-item btn"
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages || isLoading}
+                                    >
+                                        »
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -158,4 +199,4 @@ const Page = () => {
     )
 }
 
-export default Page
+export default TransactionsPage

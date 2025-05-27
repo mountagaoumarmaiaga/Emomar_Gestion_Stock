@@ -16,7 +16,9 @@ model Entreprise {
   products     Product[]
   categories   Category[]
   transactions Transaction[]
+  destinations Destination[]
 }
+
 
 model Product {
   id             String        @id @default(uuid())
@@ -43,21 +45,32 @@ model Category {
   name           String
   description    String?
 
-
   entrepriseId  String?
   entreprise   Entreprise?  @relation(fields: [entrepriseId], references: [id])
   products       Product[]
 }
 
+model Destination {
+  id           String        @id @default(uuid())
+  name         String
+  description  String?
+  entrepriseId String?
+  
+  entreprise   Entreprise?   @relation(fields: [entrepriseId], references: [id])
+  transactions Transaction[]
+}
+
 model Transaction {
-  id             String        @id @default(uuid())
-  type           String
-  quantity       Int
-  productId      String
+  id            String      @id @default(uuid())
+  type          String
+  quantity      Int
+  productId     String
   entrepriseId  String?
+  destinationId String?
+  
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  entreprise    Entreprise? @relation(fields: [entrepriseId], references: [id])
+  destination   Destination? @relation(fields: [destinationId], references: [id])
 
-  product        Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  entreprise    Entreprise?  @relation(fields: [entrepriseId], references: [id])
-
-  createdAt      DateTime      @default(now())
+  createdAt     DateTime    @default(now())
 }

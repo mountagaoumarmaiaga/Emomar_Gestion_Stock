@@ -7,11 +7,11 @@ import TransactionComponent from './TransactionComponent'
 const RecentTransactions = ({ email }: { email: string }) => {
     const [transactions, setTransactions] = useState<Transaction[]>([])
 
-    // 1. On memoize la fonction fetchData avec useCallback
     const fetchData = useCallback(async () => {
         try {
             if (email) {
-                const txs = await getTransactions(email, 10)
+                // Correction ici : passer un objet avec la propriété limit
+                const txs = await getTransactions(email, { limit: 10 })
                 if (txs) {
                     setTransactions(txs)
                 }
@@ -19,14 +19,13 @@ const RecentTransactions = ({ email }: { email: string }) => {
         } catch (error) {
             console.error(error)
         }
-    }, [email]) // email est la seule dépendance
+    }, [email])
 
-    // 2. On utilise useEffect avec toutes les dépendances nécessaires
     useEffect(() => {
         if (email) {
             fetchData()
         }
-    }, [email, fetchData]) // On inclut fetchData dans les dépendances
+    }, [email, fetchData])
 
     return (
         <div className='w-full border-2 border-base-200 mt-4 p-4 rounded-3xl'>
