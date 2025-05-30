@@ -19,7 +19,6 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
         id: "",
         name: "",
         description: "",
-        price: 0,
         imageUrl: "",
         categoryName: ""
     })
@@ -36,7 +35,6 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
                         id: fetchedProduct.id,
                         name: fetchedProduct.name,
                         description: fetchedProduct.description,
-                        price: fetchedProduct.price,
                         imageUrl: fetchedProduct.imageUrl,
                         categoryName: fetchedProduct.categoryName
                     })
@@ -44,7 +42,7 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
             }
         } catch (error) {
             console.error(error)
-            toast.error("Failed to fetch product details")
+            toast.error("Échec du chargement des détails du produit")
         }
     }, [email, params])
 
@@ -72,7 +70,7 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
             let imageUrl = formData.imageUrl
             
             if (file) {
-                // Delete old image if exists
+                // Supprimer l'ancienne image si elle existe
                 if (formData.imageUrl) {
                     const resDelete = await fetch("/api/upload", {
                         method: "DELETE",
@@ -81,11 +79,11 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
                     })
                     const dataDelete = await resDelete.json()
                     if (!dataDelete.success) {
-                        throw new Error("Error deleting old image")
+                        throw new Error("Erreur lors de la suppression de l'ancienne image")
                     }
                 }
 
-                // Upload new image
+                // Uploader la nouvelle image
                 const imageData = new FormData()
                 imageData.append("file", file)
                 const res = await fetch("/api/upload", {
@@ -95,24 +93,24 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
 
                 const data = await res.json()
                 if (!data.success) {
-                    throw new Error("Error uploading new image")
+                    throw new Error("Erreur lors de l'upload de la nouvelle image")
                 }
 
                 imageUrl = data.path
             }
 
-            // Update product with new data
+            // Mettre à jour le produit avec les nouvelles données
             const updatedData = {
                 ...formData,
                 imageUrl
             }
 
             await updateProduct(updatedData, email)
-            toast.success("Product updated successfully!")
+            toast.success("Produit mis à jour avec succès !")
             router.push("/products")
         } catch (error: unknown) {
             console.error(error)
-            const message = error instanceof Error ? error.message : "An unknown error occurred"
+            const message = error instanceof Error ? error.message : "Une erreur inconnue est survenue"
             toast.error(message)
         }
     }
@@ -123,15 +121,15 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
                 {product ? (
                     <div>
                         <h1 className='text-2xl font-bold mb-4'>
-                            Update Product
+                            Modifier le produit
                         </h1>
                         <div className='flex md:flex-row flex-col md:items-center'>
                             <form className='space-y-2' onSubmit={handleSubmit}>
-                                <div className='text-sm font-semibold mb-2'>Name</div>
+                                <div className='text-sm font-semibold mb-2'>Nom</div>
                                 <input
                                     type="text"
                                     name="name"
-                                    placeholder="Name"
+                                    placeholder="Nom"
                                     className='input input-bordered w-full'
                                     value={formData.name}
                                     onChange={handleInputChange}
@@ -146,7 +144,7 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
                                     onChange={handleInputChange}
                                     required
                                 />
-                                <div className='text-sm font-semibold mb-2'>Category</div>
+                                <div className='text-sm font-semibold mb-2'>Catégorie</div>
                                 <input
                                     type="text"
                                     name="categoryName"
@@ -155,28 +153,15 @@ const Page = ({ params }: { params: Promise<{ productId: string }> }) => {
                                     onChange={handleInputChange}
                                     disabled
                                 />
-                                <div className='text-sm font-semibold mb-2'>Image / Unit Price</div>
-                                <div className='flex'>
-                                    <input
-                                        type="file"
-                                        accept='image/*'
-                                        className='file-input file-input-bordered w-full'
-                                        onChange={handleFileChange}
-                                    />
-                                    <input
-                                        type="number"
-                                        name="price"
-                                        placeholder="Price"
-                                        className='input input-bordered w-full ml-4'
-                                        value={formData.price}
-                                        onChange={handleInputChange}
-                                        min="0"
-                                        step="0.01"
-                                        required
-                                    />
-                                </div>
+                                <div className='text-sm font-semibold mb-2'>Image</div>
+                                <input
+                                    type="file"
+                                    accept='image/*'
+                                    className='file-input file-input-bordered w-full'
+                                    onChange={handleFileChange}
+                                />
                                 <button type='submit' className='btn btn-primary mt-3'>
-                                    Update
+                                    Mettre à jour
                                 </button>
                             </form>
 

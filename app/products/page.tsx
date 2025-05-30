@@ -125,7 +125,7 @@ const ProductsPage = () => {
                                 <th>Image</th>
                                 <th>Nom</th>
                                 <th>Description</th>
-                                <th>Prix</th>
+                                {/* <th>Prix</th> */}
                                 <th>Quantité</th>
                                 <th>Catégorie</th>
                                 <th>Actions</th>
@@ -145,7 +145,7 @@ const ProductsPage = () => {
                                     </td>
                                     <td>{product.name}</td>
                                     <td className="max-w-xs truncate">{product.description}</td>
-                                    <td>{product.price} XOF</td>
+                                    {/* <td>{product.price} XOF</td> */}
                                     <td>{product.quantity} {product.unit}</td>
                                     <td>{product.categoryName}</td>
                                     <td className='flex gap-2'>

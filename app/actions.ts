@@ -2,356 +2,245 @@
 
 import prisma from "@/lib/prisma"
 import { FormDataType, OrderItem, Product, ProductOverviewStats, StockSummary, Transaction } from "@/type"
-import { Category, Prisma} from "@prisma/client"
+import { Category, Prisma } from "@prisma/client"
 
-
+// Fonction entreprise (avec nom corrigé)
 export async function checkAndAddentreprise(email: string, name: string) {
     if (!email) return
     try {
-        const existingentreprise = await prisma.entreprise.findUnique({
-            where: {
-                email
-            }
+        const existingEntreprise = await prisma.entreprise.findUnique({
+            where: { email }
         })
-        if (!existingentreprise && name) {
+        if (!existingEntreprise && name) {
             await prisma.entreprise.create({
-                data: {
-                    email, name
-                }
+                data: { email, name }
             })
         }
-
     } catch (error) {
-        console.error(error)
+        console.error("Erreur création entreprise:", error)
+        throw error
     }
 }
 
 export async function getEntreprise(email: string) {
-    if (!email) return
+    if (!email) return null
     try {
-        const existingEntreprise = await prisma.entreprise.findUnique({
-            where: {
-                email
-            }
+        return await prisma.entreprise.findUnique({
+            where: { email }
         })
-        return existingEntreprise
     } catch (error) {
-        console.error(error)
+        console.error("Erreur récupération entreprise:", error)
+        throw error
     }
 }
 
-export async function createCategory(
-    name: string,
-    email: string,
-    description?: string
-) {
-
-    if (!name) return
+// Fonctions pour les catégories
+export async function createCategory(name: string, email: string, description?: string) {
     try {
-
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
-        await prisma.category.create({
+        if (!entreprise) throw new Error("Entreprise non trouvée")
+
+        return await prisma.category.create({
             data: {
                 name,
                 description: description || "",
                 entrepriseId: entreprise.id
             }
         })
-
     } catch (error) {
-        console.error(error)
+        console.error("Erreur création catégorie:", error)
+        throw error
     }
 }
 
-export async function updateCategory(
-    id: string,
-    email: string,
-    name: string,
-    description?: string,
-) {
-
-    if (!id || !email || !name) {
-        throw new Error("L'id, l'email de l'entreprise et le nom de la catégorie sont requis pour la mise à jour.")
-    }
-
+export async function updateCategory(id: string, email: string, name: string, description?: string) {
     try {
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        await prisma.category.update({
-            where: {
-                id: id,
-                entrepriseId: entreprise.id
-            },
-            data: {
-                name,
-                description: description || "",
-            }
+        return await prisma.category.update({
+            where: { id, entrepriseId: entreprise.id },
+            data: { name, description: description || "" }
         })
-
     } catch (error) {
-        console.error(error)
+        console.error("Erreur mise à jour catégorie:", error)
+        throw error
     }
 }
 
 export async function deleteCategory(id: string, email: string) {
-    if (!id || !email) {
-        throw new Error("L'id, l'email de l'entreprise et sont requis.")
-    }
-
     try {
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        await prisma.category.delete({
-            where: {
-                id: id,
-                entrepriseId: entreprise.id
-            }
+        return await prisma.category.delete({
+            where: { id, entrepriseId: entreprise.id }
         })
     } catch (error) {
-        console.error(error)
+        console.error("Erreur suppression catégorie:", error)
+        throw error
     }
 }
 
-export async function readCategories(email: string): Promise<Category[] | undefined> {
-    if (!email) {
-        throw new Error("l'email de l'entreprise est  requis")
-    }
-
+export async function readCategories(email: string): Promise<Category[]> {
     try {
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        const categories = await prisma.category.findMany({
-            where: {
-                entrepriseId: entreprise.id
-            }
+        return await prisma.category.findMany({
+            where: { entrepriseId: entreprise.id },
+            orderBy: { name: 'asc' }
         })
-        return categories
     } catch (error) {
-        console.error(error)
+        console.error("Erreur lecture catégories:", error)
+        throw error
     }
 }
 
+// Fonctions pour les produits (avec price optionnel)
 export async function createProduct(formData: FormDataType, email: string) {
     try {
-        const { name, description, price, imageUrl, categoryId, unit } = formData;
-        if (!email || !price || !categoryId || !email) {
-            throw new Error("Le nom, le prix, la catégorie et l'email de l'entreprise sont requis pour la création du produit.")
-        }
-        const safeImageUrl = imageUrl || ""
-        const safeUnit = unit || ""
+        const { name, description, imageUrl, categoryId, unit } = formData
+        if (!name || !categoryId) throw new Error("Nom et catégorie requis")
 
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        await prisma.product.create({
+        return await prisma.product.create({
             data: {
                 name,
                 description,
-                price: Number(price),
-                imageUrl: safeImageUrl,
+                imageUrl: imageUrl || "",
                 categoryId,
-                unit: safeUnit,
-                entrepriseId: entreprise.id
+                unit: unit || "",
+                entrepriseId: entreprise.id,
+                price: 0 // Valeur par défaut temporaire
             }
         })
-
     } catch (error) {
-        console.error(error)
+        console.error("Erreur création produit:", error)
+        throw error
     }
 }
 
 export async function updateProduct(formData: FormDataType, email: string) {
     try {
-        const { id, name, description, price, imageUrl } = formData;
-        if (!email || !price || !id || !email) {
-            throw new Error("L'id, le nom, le prix et l'email sont requis pour la mise à jour du produit.")
-        }
+        const { id, name, description, imageUrl } = formData
+        if (!id || !name) throw new Error("ID et nom requis")
 
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        await prisma.product.update({
-            where: {
-                id: id,
-                entrepriseId: entreprise.id
-            },
-            data: {
+        return await prisma.product.update({
+            where: { id, entrepriseId: entreprise.id },
+            data: { 
                 name,
                 description,
-                price: Number(price),
-                imageUrl: imageUrl,
+                imageUrl
             }
         })
-
     } catch (error) {
-        console.error(error)
+        console.error("Erreur mise à jour produit:", error)
+        throw error
     }
 }
 
 export async function deleteProduct(id: string, email: string) {
     try {
-        if (!id) {
-            throw new Error("L'id est  requis pour la suppression.")
-        }
-
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        await prisma.product.delete({
-            where: {
-                id: id,
-                entrepriseId: entreprise.id
-            }
+        return await prisma.product.delete({
+            where: { id, entrepriseId: entreprise.id }
         })
     } catch (error) {
-        console.error(error)
+        console.error("Erreur suppression produit:", error)
+        throw error
     }
 }
 
 export async function readProducts(
     email: string,
     filters?: {
-        searchName?: string;
-        categoryId?: string;
+        searchName?: string
+        categoryId?: string
     }
-): Promise<Product[] | undefined> {
+): Promise<Product[]> {
     try {
-        if (!email) throw new Error("Email required")
-
-        const entreprise = await prisma.entreprise.findUnique({
-            where: { email }
-        })
-
-        if (!entreprise) throw new Error("Entreprise not found")
+        const entreprise = await getEntreprise(email)
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
         const where: Prisma.ProductWhereInput = {
             entrepriseId: entreprise.id,
             AND: [
-                filters?.searchName ? {
-                    name: { 
-                        contains: filters.searchName,
-                        mode: 'insensitive'
-                    }
+                filters?.searchName ? { 
+                    name: { contains: filters.searchName, mode: 'insensitive' } 
                 } : {},
-                filters?.categoryId ? {
-                    category: {
-                        name: filters.categoryId
-                    }
+                filters?.categoryId ? { 
+                    categoryId: filters.categoryId 
                 } : {}
             ]
         }
 
         const products = await prisma.product.findMany({
             where,
-            include: {
-                category: true
-            },
-            orderBy: {
-                createdAt: 'desc'
-            }
+            include: { category: true },
+            orderBy: { name: 'asc' }
         })
 
         return products.map(product => ({
             ...product,
-            categoryName: product.category?.name || 'Sans catégorie'
+            categoryName: product.category?.name || 'Non catégorisé'
         }))
-
     } catch (error) {
-        console.error("Error in readProducts:", error)
+        console.error("Erreur lecture produits:", error)
         throw error
     }
 }
 
-export async function readProductById(productId: string, email: string): Promise<Product | undefined> {
+export async function readProductById(productId: string, email: string): Promise<Product | null> {
     try {
-        if (!email) {
-            throw new Error("l'email est requis .")
-        }
-
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
         const product = await prisma.product.findUnique({
-            where: {
-                id: productId,
-                entrepriseId: entreprise.id
-            },
-            include: {
-                category: true
-            }
+            where: { id: productId, entrepriseId: entreprise.id },
+            include: { category: true }
         })
-        if (!product) {
-            return undefined
-        }
 
-        return {
+        return product ? {
             ...product,
             categoryName: product.category?.name
-        }
+        } : null
     } catch (error) {
-        console.error(error)
+        console.error("Erreur lecture produit:", error)
+        throw error
     }
 }
 
+// Fonctions pour les transactions
 export async function replenishStockWithTransaction(productId: string, quantity: number, email: string) {
     try {
-
-        if (quantity <= 0) {
-            throw new Error("La quantité à ajouter doit être supérieure à zéro.")
-        }
-
-        if (!email) {
-            throw new Error("l'email est requis .")
-        }
-
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        await prisma.product.update({
-            where: {
-                id: productId,
-                entrepriseId: entreprise.id
-            },
-            data: {
-                quantity: {
-                    increment: quantity
+        return await prisma.$transaction([
+            prisma.product.update({
+                where: { id: productId, entrepriseId: entreprise.id },
+                data: { quantity: { increment: quantity } }
+            }),
+            prisma.transaction.create({
+                data: {
+                    type: "IN",
+                    quantity,
+                    productId,
+                    entrepriseId: entreprise.id
                 }
-            }
-        })
-
-        await prisma.transaction.create({
-            data: {
-                type: "IN",
-                quantity: quantity,
-                productId: productId,
-                entrepriseId: entreprise.id
-            }
-        })
-
+            })
+        ])
     } catch (error) {
-        console.error(error)
+        console.error("Erreur réapprovisionnement:", error)
+        throw error
     }
 }
 
@@ -361,61 +250,15 @@ export async function deductStockWithTransaction(
     destinationId?: string
 ) {
     try {
-        if (!email) {
-            throw new Error("L'email est requis.");
-        }
+        const entreprise = await getEntreprise(email)
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        const entreprise = await getEntreprise(email);
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
-
-        // Vérification de la destination
-        if (destinationId) {
-            const destinationExists = await prisma.destination.findUnique({
-                where: { 
-                    id: destinationId,
-                    entrepriseId: entreprise.id
-                }
-            });
-            if (!destinationExists) {
-                throw new Error("Destination invalide ou non autorisée.");
-            }
-        }
-
-        // Validation des produits
-        for (const item of orderItems) {
-            const product = await prisma.product.findUnique({
-                where: { 
-                    id: item.productId,
-                    entrepriseId: entreprise.id
-                }
-            });
-
-            if (!product) {
-                throw new Error(`Produit avec l'ID ${item.productId} introuvable.`);
-            }
-
-            if (item.quantity <= 0) {
-                throw new Error(`La quantité pour "${product.name}" doit être > 0.`);
-            }
-
-            if (product.quantity < item.quantity) {
-                throw new Error(`Stock insuffisant pour "${product.name}".`);
-            }
-        }
-
-        await prisma.$transaction(async (tx) => {
+        return await prisma.$transaction(async (tx) => {
             for (const item of orderItems) {
                 await tx.product.update({
-                    where: {
-                        id: item.productId,
-                        entrepriseId: entreprise.id
-                    },
-                    data: {
-                        quantity: { decrement: item.quantity }
-                    }
-                });
+                    where: { id: item.productId, entrepriseId: entreprise.id },
+                    data: { quantity: { decrement: item.quantity } }
+                })
 
                 await tx.transaction.create({
                     data: {
@@ -423,19 +266,18 @@ export async function deductStockWithTransaction(
                         quantity: item.quantity,
                         productId: item.productId,
                         entrepriseId: entreprise.id,
-                        ...(destinationId && { destinationId }) // Conditionally add destinationId
+                        ...(destinationId && { destinationId })
                     }
-                });
+                })
             }
-        });
-
-        return { success: true };
+            return { success: true }
+        })
     } catch (error) {
-        console.error(error);
+        console.error("Erreur déduction stock:", error)
         return { 
             success: false, 
             message: error instanceof Error ? error.message : "Erreur inconnue" 
-        };
+        }
     }
 }
 
@@ -452,11 +294,7 @@ export async function getTransactions(
     }
 ): Promise<Transaction[]> {
     try {
-        if (!email) throw new Error("Email requis")
-
-        const entreprise = await prisma.entreprise.findUnique({
-            where: { email }
-        })
+        const entreprise = await getEntreprise(email)
         if (!entreprise) throw new Error("Entreprise non trouvée")
 
         const where: Prisma.TransactionWhereInput = {
@@ -474,191 +312,126 @@ export async function getTransactions(
             orderBy: { createdAt: "desc" },
             take: options?.limit,
             include: {
-                product: {
-                    include: { category: true }
+                product: { 
+                    select: {
+                        id: true,
+                        name: true,
+                        imageUrl: true,
+                        unit: true,
+                        category: { select: { name: true } }
+                    }
                 },
                 destination: true
             }
         })
 
-        return transactions.map(tx => {
-            const transaction: Transaction = {
-                id: tx.id,
-                type: tx.type as 'IN' | 'OUT',
-                quantity: tx.quantity,
-                productId: tx.productId,
-                entrepriseId: tx.entrepriseId,
-                destinationId: tx.destinationId,
-                createdAt: tx.createdAt,
-                categoryName: tx.product.category.name,
-                productName: tx.product.name,
-                imageUrl: tx.product.imageUrl,
-                price: tx.product.price,
-                unit: tx.product.unit,
-                destination: tx.destination ? {
-                    id: tx.destination.id,
-                    name: tx.destination.name,
-                    description: tx.destination.description ?? null,
-                    entrepriseId: tx.destination.entrepriseId ?? null
-                } : undefined
-            }
-            return transaction
-        })
-
+        return transactions.map(tx => ({
+            id: tx.id,
+            type: tx.type as 'IN' | 'OUT',
+            quantity: tx.quantity,
+            productId: tx.productId,
+            entrepriseId: tx.entrepriseId,
+            destinationId: tx.destinationId,
+            createdAt: tx.createdAt,
+            categoryName: tx.product.category.name,
+            productName: tx.product.name,
+            imageUrl: tx.product.imageUrl,
+            unit: tx.product.unit,
+            destination: tx.destination ? {
+                id: tx.destination.id,
+                name: tx.destination.name,
+                description: tx.destination.description,
+                entrepriseId: tx.destination.entrepriseId
+            } : undefined
+        }))
     } catch (error) {
-        console.error("Error in getTransactions:", error)
+        console.error("Erreur récupération transactions:", error)
         throw error
     }
 }
 
-
+// Fonctions pour les statistiques
 export async function getProductOverviewStats(email: string): Promise<ProductOverviewStats> {
     try {
-        if (!email) {
-            throw new Error("l'email est requis .")
-        }
-
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        const products = await prisma.product.findMany({
-            where: {
-                entrepriseId: entreprise.id
-            },
-            orderBy: {
-                createdAt: "desc"
-            },
-            include: {
-                category: true
-            }
-        })
-
-        const transactions = await prisma.transaction.findMany(
-            {
-                where: {
-                    entrepriseId: entreprise.id
-                },
-            }
-        )
-
-        const categoriesSet = new Set(products.map((product) => product.category.name))
-
-        const totalProducts = products.length
-        const totalCategories = categoriesSet.size
-        const totalTransactions = transactions.length
-        const stockValue = products.reduce((acc, product) => {
-            return acc + product.price * product.quantity
-        }, 0)
+        const [totalProducts, totalCategories, totalTransactions] = await Promise.all([
+            prisma.product.count({ where: { entrepriseId: entreprise.id } }),
+            prisma.category.count({ where: { entrepriseId: entreprise.id } }),
+            prisma.transaction.count({ where: { entrepriseId: entreprise.id } })
+        ])
 
         return {
             totalProducts,
             totalCategories,
-            totalTransactions,
-            stockValue,
+            totalTransactions
         }
     } catch (error) {
-        console.error(error)
-
+        console.error("Erreur stats overview:", error)
         return {
             totalProducts: 0,
             totalCategories: 0,
-            totalTransactions: 0,
-            stockValue: 0,
+            totalTransactions: 0
         }
     }
 }
 
 export async function getProductCategoryDistribution(email: string) {
     try {
-        if (!email) {
-            throw new Error("l'email est requis .")
-        }
-
         const entreprise = await getEntreprise(email)
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        const R = 5
-
-        const categoriesWithProductCount = await prisma.category.findMany({
-            where: {
-                entrepriseId: entreprise.id
-            },
-            include: {
-                products: {
-                    select: {
-                        id: true
-                    }
-                }
-            }
+        const categories = await prisma.category.findMany({
+            where: { entrepriseId: entreprise.id },
+            include: { _count: { select: { products: true } } },
+            orderBy: { name: 'asc' }
         })
 
-        const data = categoriesWithProductCount
-            .map((category) => (
-                {
-                    name: category.name,
-                    value: category.products.length
-                }
-            ))
-            .sort((a, b) => b.value - a.value)
-            .slice(0, R)
-
-        return data
-
+        return categories.map(category => ({
+            name: category.name,
+            value: category._count.products
+        }))
     } catch (error) {
-        console.error(error)
+        console.error("Erreur distribution catégories:", error)
+        throw error
     }
 }
 
 export async function getStockSummary(email: string): Promise<StockSummary> {
     try {
-        if (!email) {
-            throw new Error("L'email est requis.");
-        }
+        const entreprise = await getEntreprise(email)
+        if (!entreprise) throw new Error("Entreprise non trouvée")
 
-        const entreprise = await getEntreprise(email);
-        if (!entreprise) {
-            throw new Error("Aucune entreprise trouvée avec cet email.");
-        }
+        const products = await prisma.product.findMany({
+            where: { entrepriseId: entreprise.id },
+            include: { category: true }
+        })
 
-        const allProducts = await prisma.product.findMany({
-            where: {
-                entrepriseId: entreprise.id
-            },
-            include: {
-                category: true
-            }
-        });
-
-        const IN_STOCK_MIN = 20;
-        const inStock = allProducts.filter((p) => p.quantity > IN_STOCK_MIN);
-        const lowStock = allProducts.filter((p) => p.quantity > 0 && p.quantity <= IN_STOCK_MIN);
-        const outOfStock = allProducts.filter((p) => p.quantity === 0);
-        const criticalProducts = [...lowStock, ...outOfStock];
+        const IN_STOCK_MIN = 20
+        const inStock = products.filter(p => p.quantity > IN_STOCK_MIN)
+        const lowStock = products.filter(p => p.quantity > 0 && p.quantity <= IN_STOCK_MIN)
+        const outOfStock = products.filter(p => p.quantity === 0)
 
         return {
             inStockCount: inStock.length,
             lowStockCount: lowStock.length,
             outOfStockCount: outOfStock.length,
-            criticalProducts: criticalProducts.map((p) => ({
+            criticalProducts: [...lowStock, ...outOfStock].map(p => ({
                 id: p.id,
                 name: p.name,
                 quantity: p.quantity,
                 categoryName: p.category?.name || "Non catégorisé",
                 imageUrl: p.imageUrl
             }))
-        };
-
+        }
     } catch (error) {
-        console.error(error);
+        console.error("Erreur summary stock:", error)
         return {
             inStockCount: 0,
             lowStockCount: 0,
             outOfStockCount: 0,
             criticalProducts: []
-        };
+        }
     }
 }

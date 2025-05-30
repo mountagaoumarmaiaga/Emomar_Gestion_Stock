@@ -13,6 +13,11 @@ import { toast } from 'react-toastify'
 
 const DESTINATIONS_PER_PAGE = 5;
 
+type DeductStockResponse = {
+  success: boolean;
+  message?: string;
+};
+
 const Page = () => {
     const { user } = useUser()
     const email = user?.primaryEmailAddress?.emailAddress as string
@@ -113,7 +118,7 @@ const Page = () => {
                 })
             });
 
-            if (!response.ok) throw new Error();
+            if (!response.ok) throw new Error("Erreur lors de la création");
             
             const newDest = await response.json();
             setDestinations(prev => [...prev, newDest]);
@@ -124,7 +129,7 @@ const Page = () => {
             toast.success("Destination créée");
         } catch (error) {
             console.error(error);
-            toast.error("Erreur de création");
+            toast.error(error instanceof Error ? error.message : "Erreur de création");
         }
     };
 
@@ -163,7 +168,7 @@ const Page = () => {
                 order, 
                 email,
                 finalDestinationId
-            );
+            ) as DeductStockResponse;
 
             if (response?.success) {
                 toast.success("Sortie enregistrée");
@@ -173,12 +178,11 @@ const Page = () => {
                 setManualDestination("");
                 fetchData();
             } else {
-                throw new Error(response?.message);
+                throw new Error(response?.message ?? "Erreur lors de la sortie du stock");
             }
         } catch (error) {
             console.error(error);
-            toast.error((error as Error).message || "Erreur");
-
+            toast.error(error instanceof Error ? error.message : "Erreur inconnue");
         } finally {
             setIsLoading(false);
         }
@@ -405,7 +409,7 @@ const Page = () => {
                             <button
                                 onClick={handleSubmit}
                                 className='btn btn-primary mt-4 w-full'
-                                disabled={!selectedDestinationId && !manualDestination || isLoading}
+                                disabled={(!selectedDestinationId && !manualDestination) || isLoading}
                             >
                                 {isLoading ? (
                                     <span className="loading loading-spinner"></span>
