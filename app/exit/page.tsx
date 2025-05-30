@@ -69,14 +69,14 @@ const Page = () => {
             return existing 
                 ? prev.map(item => 
                     item.productId === product.id 
-                        ? { ...item, quantity: Math.min(item.quantity + 1, product.quantity) } 
+                        ? { ...item, quantity: item.quantity + 1 } 
                         : item
                 )
                 : [
                     ...prev,
                     {
                         productId: product.id,
-                        quantity: 1,
+                        quantity: 0, // Initialisé à 0 pour permettre la saisie libre
                         unit: product.unit,
                         imageUrl: product.imageUrl,
                         name: product.name,
@@ -89,10 +89,23 @@ const Page = () => {
         );
     };
 
-    const handleQuantityChange = (productId: string, quantity: number) => {
-        setOrder(prev => prev.map(item => 
-            item.productId === productId ? { ...item, quantity } : item
-        ));
+    const handleQuantityChange = (productId: string, quantity: number | '') => {
+        if (quantity === '') {
+            // Permet de vider complètement le champ
+            setOrder(prev => prev.map(item => 
+                item.productId === productId 
+                    ? { ...item, quantity: 0 }
+                    : item
+            ));
+        } else {
+            // Valider que la quantité est au moins 1
+            const newQuantity = Math.max(1, quantity);
+            setOrder(prev => prev.map(item => 
+                item.productId === productId 
+                    ? { ...item, quantity: newQuantity }
+                    : item
+            ));
+        }
     };
 
     const handleRemoveFromCart = (productId: string) => {
@@ -139,6 +152,29 @@ const Page = () => {
         try {
             if (order.length === 0) {
                 toast.error("Ajoutez des produits");
+                return;
+            }
+
+            // Vérifier les quantités nulles
+            const emptyQuantityItems = order.filter(item => item.quantity < 1);
+            if (emptyQuantityItems.length > 0) {
+                toast.error("Veuillez saisir une quantité valide pour tous les produits");
+                return;
+            }
+
+            // Vérification des stocks
+            const outOfStockItems = order.filter(item => {
+                const product = products.find(p => p.id === item.productId);
+                return product && item.quantity > product.quantity;
+            });
+
+            if (outOfStockItems.length > 0) {
+                const productNames = outOfStockItems.map(item => {
+                    const product = products.find(p => p.id === item.productId);
+                    return product?.name;
+                }).join(", ");
+                
+                toast.error(`Stock insuffisant pour: ${productNames}`);
                 return;
             }
             
@@ -367,40 +403,63 @@ const Page = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {order.map((item) => (
-                                            <tr key={item.productId}>
-                                                <td>
-                                                    <ProductImage
-                                                        src={item.imageUrl}
-                                                        alt={item.name}
-                                                        heightClass='h-12'
-                                                        widthClass='w-12'
-                                                    />
-                                                </td>
-                                                <td>{item.name}</td>
-                                                <td>
-                                                    <input
-                                                        type="number"
-                                                        value={item.quantity}
-                                                        min="1"
-                                                        max={item.availableQuantity}
-                                                        className='input input-bordered w-20'
-                                                        onChange={(e) => 
-                                                            handleQuantityChange(item.productId, Number(e.target.value))
-                                                        }
-                                                    />
-                                                </td>
-                                                <td className='capitalize'>{item.unit}</td>
-                                                <td>
-                                                    <button
-                                                        className='btn btn-sm btn-error'
-                                                        onClick={() => handleRemoveFromCart(item.productId)}
-                                                    >
-                                                        <Trash size={16} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {order.map((item) => {
+                                            const product = products.find(p => p.id === item.productId);
+                                            const isOutOfStock = product ? item.quantity > product.quantity : false;
+                                            
+                                            return (
+                                                <tr key={item.productId} className={isOutOfStock ? "bg-error/10" : ""}>
+                                                    <td>
+                                                        <ProductImage
+                                                            src={item.imageUrl}
+                                                            alt={item.name}
+                                                            heightClass='h-12'
+                                                            widthClass='w-12'
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        {item.name}
+                                                        {isOutOfStock && (
+                                                            <div className="text-error text-sm">Stock insuffisant</div>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="number"
+                                                            value={item.quantity === 0 ? '' : item.quantity}
+                                                            min="1"
+                                                            className={`input input-bordered w-20 ${isOutOfStock ? "input-error" : ""}`}
+                                                            onChange={(e) => {
+                                                                const value = e.target.value;
+                                                                handleQuantityChange(
+                                                                    item.productId, 
+                                                                    value === '' ? '' : Number(value)
+                                                                );
+                                                            }}
+                                                            onBlur={(e) => {
+                                                                if (!e.target.value || parseInt(e.target.value) < 1) {
+                                                                    handleQuantityChange(item.productId, 1);
+                                                                }
+                                                            }}
+                                                        />
+                                                        {product && (
+                                                            <div className="text-sm text-gray-500">
+                                                                Stock disponible: {product.quantity}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className='capitalize'>{item.unit}</td>
+                                                    <td>
+                                                        <button
+                                                            className='btn btn-sm btn-error'
+                                                            onClick={() => handleRemoveFromCart(item.productId)}
+                                                        >
+                                                            <Trash size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
