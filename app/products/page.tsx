@@ -18,17 +18,17 @@ const ProductsPage = () => {
     const [categoryFilter, setCategoryFilter] = useState('')
     const [isLoading, setIsLoading] = useState(true)
 
-    // Fetch products with filters
+    // Récupérer les produits
     const fetchProducts = useCallback(async () => {
         try {
             setIsLoading(true)
             if (!email) return
-            
+
             const result = await readProducts(email, {
                 searchName: searchTerm,
                 categoryId: categoryFilter
             })
-            
+
             if (result) {
                 setProducts(result)
             }
@@ -46,38 +46,38 @@ const ProductsPage = () => {
 
     const handleDelete = async (product: Product) => {
         if (!confirm('Voulez-vous vraiment supprimer ce produit ?')) return
-        
+
         try {
-            // Delete image if exists
+            // Supprimer l'image si elle existe
             if (product.imageUrl) {
                 const res = await fetch('/api/upload', {
                     method: 'DELETE',
                     body: JSON.stringify({ path: product.imageUrl }),
                     headers: { 'Content-Type': 'application/json' }
                 })
-                
-                if (!res.ok) throw new Error('Failed to delete image')
+
+                if (!res.ok) throw new Error('Erreur lors de la suppression de l’image.')
             }
 
-            // Delete product
+            // Supprimer le produit
             if (email) {
                 await deleteProduct(product.id, email)
                 toast.success('Produit supprimé avec succès')
                 await fetchProducts()
             }
         } catch (error) {
-            console.error('Delete failed:', error)
+            console.error('Échec de la suppression:', error)
             toast.error('Échec de la suppression du produit')
         }
     }
 
-    // Get unique categories for filter dropdown
+    // Liste des catégories uniques
     const categories = Array.from(new Set(products.map(p => p.categoryName)))
 
     return (
         <Wrapper>
             <div className="mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
-                {/* Search Input */}
+                {/* Recherche */}
                 <div className="relative w-full md:w-1/2">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Search className="h-5 w-5 text-gray-400" />
@@ -90,8 +90,8 @@ const ProductsPage = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                
-                {/* Category Filter */}
+
+                {/* Filtre de catégorie */}
                 <select
                     className="select select-bordered w-full md:w-1/3"
                     value={categoryFilter}
@@ -106,7 +106,7 @@ const ProductsPage = () => {
                 </select>
             </div>
 
-            {/* Products Table */}
+            {/* Table des produits */}
             <div className='overflow-x-auto'>
                 {isLoading ? (
                     <div className="flex justify-center">
@@ -125,7 +125,6 @@ const ProductsPage = () => {
                                 <th>Image</th>
                                 <th>Nom</th>
                                 <th>Description</th>
-                                {/* <th>Prix</th> */}
                                 <th>Quantité</th>
                                 <th>Catégorie</th>
                                 <th>Actions</th>
@@ -145,7 +144,6 @@ const ProductsPage = () => {
                                     </td>
                                     <td>{product.name}</td>
                                     <td className="max-w-xs truncate">{product.description}</td>
-                                    {/* <td>{product.price} XOF</td> */}
                                     <td>{product.quantity} {product.unit}</td>
                                     <td>{product.categoryName}</td>
                                     <td className='flex gap-2'>
