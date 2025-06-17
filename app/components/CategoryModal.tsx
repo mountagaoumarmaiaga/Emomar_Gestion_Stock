@@ -1,10 +1,11 @@
 import React from 'react'
 
 interface Props {
+    title: string;
     name: string,
     description: string,
     loading: boolean,
-    onclose: () => void,
+    onClose: () => void,
     onChangeName: (value: string) => void,
     onChangeDescription: (value: string) => void,
     onSubmit: () => void,
@@ -12,14 +13,14 @@ interface Props {
 }
 
 const CategoryModal: React.FC<Props> = ({
-    name, description, loading, onclose, onChangeDescription, onChangeName, editMode, onSubmit
+    name, description, loading, onClose, onChangeDescription, onChangeName, editMode, onSubmit
 }) => {
     return (
         <dialog id="category_modal" className="modal">
             <div className="modal-box">
                 <form method="dialog">
                     <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
-                        onClick={onclose}
+                        onClick={onClose}
                     >
                         ✕
                     </button>

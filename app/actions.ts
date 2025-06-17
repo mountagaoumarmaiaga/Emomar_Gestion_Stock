@@ -1,10 +1,10 @@
 "use server"
 
 import prisma from "@/lib/prisma"
-import { FormDataType, OrderItem, Product, ProductOverviewStats, StockSummary, Transaction } from "@/type"
-import { Category, Prisma } from "@prisma/client"
+import { CategoryWithSub, FormDataType, OrderItem, Product, ProductOverviewStats, StockSummary, SubCategoryWithCount, Transaction } from "@/type"
+import { Category, Prisma, SubCategory } from "@prisma/client"
 
-// Fonction entreprise (avec nom corrigé)
+// Fonctions pour l'entreprise
 export async function checkAndAddentreprise(email: string, name: string) {
     if (!email) return
     try {
@@ -97,10 +97,129 @@ export async function readCategories(email: string): Promise<Category[]> {
     }
 }
 
-// Fonctions pour les produits (avec price optionnel)
+// Fonctions pour les sous-catégories
+export async function createSubCategory(name: string, categoryId: string, email: string, description?: string) {
+    try {
+        const entreprise = await getEntreprise(email)
+        if (!entreprise) throw new Error("Entreprise non trouvée")
+
+        return await prisma.subCategory.create({
+            data: {
+                name,
+                description: description || "",
+                categoryId,
+                entrepriseId: entreprise.id
+            }
+        })
+    } catch (error) {
+        console.error("Erreur création sous-catégorie:", error)
+        throw error
+    }
+}
+
+export async function updateSubCategory(id: string, email: string, name: string, description?: string) {
+    try {
+        const entreprise = await getEntreprise(email)
+        if (!entreprise) throw new Error("Entreprise non trouvée")
+
+        return await prisma.subCategory.update({
+            where: { id, entrepriseId: entreprise.id },
+            data: { name, description: description || "" }
+        })
+    } catch (error) {
+        console.error("Erreur mise à jour sous-catégorie:", error)
+        throw error
+    }
+}
+
+export async function deleteSubCategory(id: string, email: string) {
+    try {
+        const entreprise = await getEntreprise(email)
+        if (!entreprise) throw new Error("Entreprise non trouvée")
+
+        return await prisma.subCategory.delete({
+            where: { id, entrepriseId: entreprise.id }
+        })
+    } catch (error) {
+        console.error("Erreur suppression sous-catégorie:", error)
+        throw error
+    }
+}
+
+export async function readSubCategories(email: string, categoryId?: string): Promise<SubCategory[]> {
+    try {
+        const entreprise = await getEntreprise(email)
+        if (!entreprise) throw new Error("Entreprise non trouvée")
+
+        const where: Prisma.SubCategoryWhereInput = {
+            entrepriseId: entreprise.id,
+            ...(categoryId && { categoryId })
+        }
+
+        return await prisma.subCategory.findMany({
+            where,
+            orderBy: { name: 'asc' },
+            include: { category: true }
+        })
+    } catch (error) {
+        console.error("Erreur lecture sous-catégories:", error)
+        throw error
+    }
+}
+export async function readCategoriesWithSub(email: string): Promise<CategoryWithSub[]> {
+    try {
+        const entreprise = await getEntreprise(email)
+        if (!entreprise) throw new Error("Entreprise non trouvée")
+
+        return await prisma.category.findMany({
+            where: { entrepriseId: entreprise.id },
+            include: {
+                subCategories: {
+                    include: {
+                        _count: { select: { products: true } }
+                    }
+                },
+                _count: { select: { products: true } }
+            },
+            orderBy: { name: 'asc' }
+        })
+    } catch (error) {
+        console.error("Erreur lecture catégories:", error)
+        throw error
+    }
+}
+
+export async function readSubCategoriesWithCount(
+    email: string, 
+    categoryId?: string
+): Promise<SubCategoryWithCount[]> {
+    try {
+        const entreprise = await getEntreprise(email)
+        if (!entreprise) throw new Error("Entreprise non trouvée")
+
+        const where: Prisma.SubCategoryWhereInput = {
+            entrepriseId: entreprise.id,
+            ...(categoryId && { categoryId })
+        }
+
+        return await prisma.subCategory.findMany({
+            where,
+            include: {
+                _count: { select: { products: true } },
+                category: true
+            },
+            orderBy: { name: 'asc' }
+        })
+    } catch (error) {
+        console.error("Erreur lecture sous-catégories:", error)
+        throw error
+    }
+}
+
+// Fonctions pour les produits
 export async function createProduct(formData: FormDataType, email: string) {
     try {
-        const { name, description, imageUrl, categoryId, unit } = formData
+        const { name, description, imageUrl, categoryId, subCategoryId, unit, reference } = formData
         if (!name || !categoryId) throw new Error("Nom et catégorie requis")
 
         const entreprise = await getEntreprise(email)
@@ -112,9 +231,11 @@ export async function createProduct(formData: FormDataType, email: string) {
                 description,
                 imageUrl: imageUrl || "",
                 categoryId,
+                subCategoryId: subCategoryId || null,
                 unit: unit || "",
+                reference: reference || null,
                 entrepriseId: entreprise.id,
-                price: 0 // Valeur par défaut temporaire
+                
             }
         })
     } catch (error) {
@@ -125,7 +246,7 @@ export async function createProduct(formData: FormDataType, email: string) {
 
 export async function updateProduct(formData: FormDataType, email: string) {
     try {
-        const { id, name, description, imageUrl } = formData
+        const { id, name, description, imageUrl, subCategoryId, reference } = formData
         if (!id || !name) throw new Error("ID et nom requis")
 
         const entreprise = await getEntreprise(email)
@@ -136,7 +257,9 @@ export async function updateProduct(formData: FormDataType, email: string) {
             data: { 
                 name,
                 description,
-                imageUrl
+                imageUrl,
+                subCategoryId: subCategoryId || null,
+                reference: reference || null
             }
         })
     } catch (error) {
@@ -164,6 +287,8 @@ export async function readProducts(
     filters?: {
         searchName?: string
         categoryId?: string
+        subCategoryId?: string
+        reference?: string
     }
 ): Promise<Product[]> {
     try {
@@ -174,23 +299,30 @@ export async function readProducts(
             entrepriseId: entreprise.id,
             AND: [
                 filters?.searchName ? { 
-                    name: { contains: filters.searchName, mode: 'insensitive' } 
+                    OR: [
+                        { name: { contains: filters.searchName, mode: 'insensitive' } },
+                        { reference: { contains: filters.searchName, mode: 'insensitive' } }
+                    ]
                 } : {},
-                filters?.categoryId ? { 
-                    categoryId: filters.categoryId 
-                } : {}
+                filters?.categoryId ? { categoryId: filters.categoryId } : {},
+                filters?.subCategoryId ? { subCategoryId: filters.subCategoryId } : {},
+                filters?.reference ? { reference: { contains: filters.reference } } : {}
             ]
         }
 
         const products = await prisma.product.findMany({
             where,
-            include: { category: true },
+            include: { 
+                category: true,
+                subCategory: true 
+            },
             orderBy: { name: 'asc' }
         })
 
         return products.map(product => ({
             ...product,
-            categoryName: product.category?.name || 'Non catégorisé'
+            categoryName: product.category?.name || 'Non catégorisé',
+            subCategoryName: product.subCategory?.name || 'Non spécifiée'
         }))
     } catch (error) {
         console.error("Erreur lecture produits:", error)
@@ -205,12 +337,16 @@ export async function readProductById(productId: string, email: string): Promise
 
         const product = await prisma.product.findUnique({
             where: { id: productId, entrepriseId: entreprise.id },
-            include: { category: true }
+            include: { 
+                category: true,
+                subCategory: true 
+            }
         })
 
         return product ? {
             ...product,
-            categoryName: product.category?.name
+            categoryName: product.category?.name,
+            subCategoryName: product.subCategory?.name
         } : null
     } catch (error) {
         console.error("Erreur lecture produit:", error)
@@ -384,13 +520,24 @@ export async function getProductCategoryDistribution(email: string) {
 
         const categories = await prisma.category.findMany({
             where: { entrepriseId: entreprise.id },
-            include: { _count: { select: { products: true } } },
+            include: { 
+                _count: { select: { products: true } },
+                subCategories: {
+                    include: {
+                        _count: { select: { products: true } }
+                    }
+                }
+            },
             orderBy: { name: 'asc' }
         })
 
         return categories.map(category => ({
             name: category.name,
-            value: category._count.products
+            value: category._count.products,
+            subCategories: category.subCategories.map(subCat => ({
+                name: subCat.name,
+                value: subCat._count.products
+            }))
         }))
     } catch (error) {
         console.error("Erreur distribution catégories:", error)
@@ -405,7 +552,10 @@ export async function getStockSummary(email: string): Promise<StockSummary> {
 
         const products = await prisma.product.findMany({
             where: { entrepriseId: entreprise.id },
-            include: { category: true }
+            include: { 
+                category: true,
+                subCategory: true 
+            }
         })
 
         const IN_STOCK_MIN = 20
@@ -422,7 +572,9 @@ export async function getStockSummary(email: string): Promise<StockSummary> {
                 name: p.name,
                 quantity: p.quantity,
                 categoryName: p.category?.name || "Non catégorisé",
-                imageUrl: p.imageUrl
+                subCategoryName: p.subCategory?.name || "Non spécifiée",
+                imageUrl: p.imageUrl,
+                reference: p.reference || "N/A"
             }))
         }
     } catch (error) {

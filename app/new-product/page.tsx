@@ -2,9 +2,9 @@
 import React, { useEffect, useState } from 'react'
 import Wrapper from '../components/Wrapper'
 import { useUser } from '@clerk/nextjs'
-import { Category } from '@prisma/client'
+import { Category, SubCategory } from '@prisma/client'
 import { FormDataType } from '@/type'
-import { createProduct, readCategories } from '../actions'
+import { createProduct, readCategories, readSubCategories } from '../actions'
 import { FileImage } from 'lucide-react'
 import ProductImage from '../components/ProductImage'
 import { toast } from 'react-toastify'
@@ -18,17 +18,20 @@ const Page = () => {
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
+  const [subCategories, setSubCategories] = useState<SubCategory[]>([])
   const [formData, setFormData] = useState<FormDataType>({
     name: "",
     description: "",
     categoryId: "",
+    subCategoryId: "",
     unit: "",
+    reference: "",
     imageUrl: ""
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-    setFormData({ ...formData, [name]: value })
+    setFormData(prev => ({ ...prev, [name]: value }))
   }
 
   useEffect(() => {
@@ -36,15 +39,34 @@ const Page = () => {
       try {
         if (email) {
           const data = await readCategories(email)
-          if (data)
-            setCategories(data)
+          if (data) setCategories(data)
         }
       } catch (error) {
         console.error("Erreur lors du chargement des catégories", error)
+        toast.error("Erreur lors du chargement des catégories")
       }
     }
     fetchCategories()
   }, [email])
+
+  useEffect(() => {
+    const fetchSubCategories = async () => {
+      if (!formData.categoryId) {
+        setSubCategories([])
+        return
+      }
+
+      try {
+        const data = await readSubCategories(email, formData.categoryId)
+        if (data) setSubCategories(data)
+      } catch (error) {
+        console.error("Erreur lors du chargement des sous-catégories", error)
+        toast.error("Erreur lors du chargement des sous-catégories")
+      }
+    }
+
+    fetchSubCategories()
+  }, [formData.categoryId, email])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null
@@ -55,14 +77,13 @@ const Page = () => {
   }
 
   const handleSubmit = async () => {
-    // Vérifie les champs du formulaire (prix retiré des vérifications)
     if (!formData.name || !formData.description || !formData.categoryId || !formData.unit) {
-      toast.error("Veuillez remplir tous les champs du formulaire.")
+      toast.error("Veuillez remplir tous les champs obligatoires")
       return
     }
 
     if (!file) {
-      toast.error("Veuillez sélectionner une image.")
+      toast.error("Veuillez sélectionner une image")
       return
     }
 
@@ -78,18 +99,19 @@ const Page = () => {
       const data = await res.json()
 
       if (!data.success) {
-        throw new Error("Erreur lors de l'upload de l'image.")
+        throw new Error("Erreur lors de l'upload de l'image")
       }
 
-      formData.imageUrl = data.path
-      await createProduct(formData, email)
+      await createProduct({
+        ...formData,
+        imageUrl: data.path
+      }, email)
 
       toast.success("Produit créé avec succès")
       router.push("/products")
-
     } catch (error) {
-      console.log(error)
-      toast.error("Il y a une erreur")
+      console.error(error)
+      toast.error("Une erreur est survenue lors de la création du produit")
     }
   }
 
@@ -98,7 +120,7 @@ const Page = () => {
       <div className='flex justify-center items-center'>
         <div>
           <h1 className='text-2xl font-bold mb-4'>
-            Créer Un produit
+            Créer un produit
           </h1>
 
           <section className='flex md:flex-row flex-col'>
@@ -111,7 +133,16 @@ const Page = () => {
                 value={formData.name}
                 onChange={handleChange}
               />
-              
+
+              <input
+                type="text"
+                name="reference"
+                placeholder="Référence"
+                className='input input-bordered w-full'
+                value={formData.reference?? ""}
+                onChange={handleChange}
+              />
+
               <textarea
                 name="description"
                 placeholder="Description"
@@ -129,6 +160,19 @@ const Page = () => {
                 <option value="">Sélectionner une catégorie</option>
                 {categories.map((cat) => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+
+              <select
+                className='select select-bordered w-full'
+                value={formData.subCategoryId?? ""}
+                onChange={handleChange}
+                name='subCategoryId'
+                disabled={!formData.categoryId}
+              >
+                <option value="">Sélectionner une sous-catégorie</option>
+                {subCategories.map((subCat) => (
+                  <option key={subCat.id} value={subCat.id}>{subCat.name}</option>
                 ))}
               </select>
 
@@ -157,7 +201,7 @@ const Page = () => {
               </button>
             </div>
 
-            <div className='md:ml-4 md:w-[300px] mt-4 md:mt-0 border-2 border-primary md:h-[300px] p-5 flex justify-center items-center rounded-3xl'>
+            <div className='md:ml-4 md:w-[200px] mt-4 md:mt-0 border-2 border-primary md:h-[300px] p-5 flex justify-center items-center rounded-3xl'>
               {previewUrl ? (
                 <ProductImage
                   src={previewUrl}

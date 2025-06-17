@@ -2,12 +2,22 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import Wrapper from '../components/Wrapper'
 import CategoryModal from '../components/CategoryModal'
+import SubCategoryModal from '../components/SubCategoryModal '
 import { useUser } from '@clerk/nextjs'
-import { createCategory, deleteCategory, readCategories, updateCategory } from '../actions'
+import { 
+  createCategory, 
+  deleteCategory, 
+  readCategoriesWithSub, 
+  updateCategory,
+  createSubCategory,
+  deleteSubCategory,
+  updateSubCategory
+} from '../actions'
 import { toast } from 'react-toastify'
-import { Category } from '@prisma/client'
 import EmptyState from '../components/EmptyState'
-import { Pencil, Trash } from 'lucide-react'
+import { Pencil, Trash, Plus } from 'lucide-react'
+import { CategoryWithSub } from '@/type'
+import { SubCategory } from '@prisma/client'
 
 const Page = () => {
   const { user } = useUser()
@@ -17,122 +27,277 @@ const Page = () => {
   const [description, setDescription] = useState("")
   const [loading, setLoading] = useState(false)
   const [editMode, setEditMode] = useState(false)
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
-  const [categories, setCategories] = useState<Category[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [categories, setCategories] = useState<CategoryWithSub[]>([])
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [showSubCategories, setShowSubCategories] = useState<Record<string, boolean>>({})
 
-  // Utilisation de useCallback pour mémoriser la fonction
   const loadCategories = useCallback(async () => {
     if (email) {
-      const data = await readCategories(email)
-      if (data)
+      try {
+        const data = await readCategoriesWithSub(email)
         setCategories(data)
+        
+        // Initialize subcategory visibility
+        const visibility: Record<string, boolean> = {}
+        data.forEach(cat => {
+          visibility[cat.id] = false
+        })
+        setShowSubCategories(visibility)
+      } catch (error) {
+        console.error("Failed to load categories", error)
+        toast.error("Failed to load categories")
+      }
     }
-  }, [email]) // email est maintenant une dépendance
+  }, [email])
 
   useEffect(() => {
     loadCategories()
-  }, [loadCategories]) // Utilisation de la fonction mémorisée comme dépendance
+  }, [loadCategories])
 
+  // Category handlers
   const openCreateModal = () => {
-    setName("");
-    setDescription("");
-    setEditMode(false);
-    (document.getElementById("category_modal") as HTMLDialogElement)?.showModal()
+    setName("")
+    setDescription("")
+    setEditMode(false)
+    setEditingId(null)
+    setSelectedCategoryId(null)
+    ;(document.getElementById("category_modal") as HTMLDialogElement)?.showModal()
   }
 
-  const closeModal = () => {
-    setName("");
-    setDescription("");
-    setEditMode(false);
-    (document.getElementById("category_modal") as HTMLDialogElement)?.close()
+  const openEditCategoryModal = (category: CategoryWithSub) => {
+    setName(category.name)
+    setDescription(category.description || "")
+    setEditMode(true)
+    setEditingId(category.id)
+    ;(document.getElementById("category_modal") as HTMLDialogElement)?.showModal()
   }
 
   const handleCreateCategory = async () => {
     setLoading(true)
-    if (email) {
+    try {
       await createCategory(name, email, description)
+      await loadCategories()
+      ;(document.getElementById("category_modal") as HTMLDialogElement)?.close()
+      toast.success("Category created successfully")
+    } catch (error) {
+      console.error(error)
+      toast.error("Failed to create category")
+    } finally {
+      setLoading(false)
     }
-    await loadCategories()
-    closeModal()
-    setLoading(false)
-    toast.success("Catégorie créée avec succès.")
   }
 
   const handleUpdateCategory = async () => {
-    if (!editingCategoryId) return
+    if (!editingId) return
     setLoading(true)
-    if (email) {
-      await updateCategory(editingCategoryId, email, name, description)
+    try {
+      await updateCategory(editingId, email, name, description)
+      await loadCategories()
+      ;(document.getElementById("category_modal") as HTMLDialogElement)?.close()
+      toast.success("Category updated successfully")
+    } catch (error) {
+      console.error(error)
+      toast.error("Failed to update category")
+    } finally {
+      setLoading(false)
     }
-    await loadCategories()
-    closeModal()
-    setLoading(false)
-    toast.success("Catégorie mise à jour avec succès.")
-  }
-
-  const openEditModal = (category: Category) => {
-    setName(category.name);
-    setDescription(category.description || " ");
-    setEditMode(true);
-    setEditingCategoryId(category.id);
-    (document.getElementById("category_modal") as HTMLDialogElement)?.showModal()
   }
 
   const handleDeleteCategory = async (categoryId: string) => {
-    const confirmDelete = confirm("Voulez-vous vraiment supprimer cette catégorie ? Tous les produits associés seront également supprimés")
-    if (!confirmDelete) return;
-    await deleteCategory(categoryId, email);
-    await loadCategories();
-    toast.success("Catégorie supprimée avec succès.")
+    if (!confirm("Delete this category and all its subcategories?")) return
+    try {
+      await deleteCategory(categoryId, email)
+      await loadCategories()
+      toast.success("Category deleted successfully")
+    } catch (error) {
+      console.error(error)
+      toast.error("Failed to delete category")
+    }
+  }
+
+  // Subcategory handlers
+  const toggleSubCategories = (categoryId: string) => {
+    setShowSubCategories(prev => ({
+      ...prev,
+      [categoryId]: !prev[categoryId]
+    }))
+  }
+
+  const openCreateSubCategoryModal = (categoryId: string) => {
+    setName("")
+    setDescription("")
+    setEditMode(false)
+    setEditingId(null)
+    setSelectedCategoryId(categoryId)
+    ;(document.getElementById("subcategory_modal") as HTMLDialogElement)?.showModal()
+  }
+
+  const openEditSubCategoryModal = (subCategory: SubCategory) => {
+    setName(subCategory.name)
+    setDescription(subCategory.description || "")
+    setEditMode(true)
+    setEditingId(subCategory.id)
+    setSelectedCategoryId(subCategory.categoryId)
+    ;(document.getElementById("subcategory_modal") as HTMLDialogElement)?.showModal()
+  }
+
+  const handleCreateSubCategory = async () => {
+    if (!selectedCategoryId) return
+    setLoading(true)
+    try {
+      await createSubCategory(name, selectedCategoryId, email, description)
+      await loadCategories()
+      ;(document.getElementById("subcategory_modal") as HTMLDialogElement)?.close()
+      toast.success("Subcategory created successfully")
+    } catch (error) {
+      console.error(error)
+      toast.error("Failed to create subcategory")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleUpdateSubCategory = async () => {
+    if (!editingId) return
+    setLoading(true)
+    try {
+      await updateSubCategory(editingId, email, name, description)
+      await loadCategories()
+      ;(document.getElementById("subcategory_modal") as HTMLDialogElement)?.close()
+      toast.success("Subcategory updated successfully")
+    } catch (error) {
+      console.error(error)
+      toast.error("Failed to update subcategory")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteSubCategory = async (subCategoryId: string) => {
+    if (!confirm("Delete this subcategory?")) return
+    try {
+      await deleteSubCategory(subCategoryId, email)
+      await loadCategories()
+      toast.success("Subcategory deleted successfully")
+    } catch (error) {
+      console.error(error)
+      toast.error("Failed to delete subcategory")
+    }
   }
 
   return (
     <Wrapper>
       <div>
         <div className='mb-4'>
-          <button className='btn btn-primary'
-            onClick={openCreateModal}
-          >
-            Ajouter une catégorie
+          <button className='btn btn-primary' onClick={openCreateModal}>
+            Add Category
           </button>
         </div>
 
         {categories.length > 0 ? (
-          <div>
+          <div className='space-y-4'>
             {categories.map((category) => (
-              <div key={category.id} className='mb-2 p-5 border-2 border-base-200 rounded-3xl flex justify-between items-center'>
-                <div>
-                  <strong className='text-lg'>{category.name}</strong>
-                  <div className='text-sm'>{category.description}</div>
+              <div key={category.id} className='border-2 border-base-200 rounded-3xl overflow-hidden'>
+                <div className='p-5 flex justify-between items-center bg-base-100'>
+                  <div className='flex items-center gap-3'>
+                    <button 
+                      onClick={() => toggleSubCategories(category.id)}
+                      className='btn btn-circle btn-sm'
+                    >
+                      {showSubCategories[category.id] ? '−' : '+'}
+                    </button>
+                    <div>
+                      <strong className='text-lg'>{category.name}</strong>
+                      <div className='text-sm'>{category.description}</div>
+                    </div>
+                  </div>
+                  <div className='flex gap-2'>
+                    <button 
+                      className='btn btn-sm btn-success'
+                      onClick={() => openCreateSubCategoryModal(category.id)}
+                    >
+                      <Plus className='w-4 h-4' />
+                    </button>
+                    <button 
+                      className='btn btn-sm' 
+                      onClick={() => openEditCategoryModal(category)}
+                    >
+                      <Pencil className='w-4 h-4' />
+                    </button>
+                    <button 
+                      className='btn btn-sm btn-error' 
+                      onClick={() => handleDeleteCategory(category.id)}
+                    >
+                      <Trash className='w-4 h-4' />
+                    </button>
+                  </div>
                 </div>
-                <div className='flex gap-2'>
-                  <button className='btn btn-sm' onClick={() => openEditModal(category)}>
-                    <Pencil className='w-4 h-4' />
-                  </button>
-                  <button className='btn btn-sm btn-error' onClick={() => handleDeleteCategory(category.id)}>
-                    <Trash className='w-4 h-4' />
-                  </button>
-                </div>
+
+                {showSubCategories[category.id] && (
+                  <div className='bg-base-200 p-4 space-y-3'>
+                    {category.subCategories && category.subCategories.length > 0 ? (
+                      category.subCategories.map((subCategory) => (
+                        <div key={subCategory.id} className='p-3 bg-base-100 rounded-lg flex justify-between items-center'>
+                          <div>
+                            <strong>{subCategory.name}</strong>
+                            <div className='text-sm'>{subCategory.description}</div>
+                          </div>
+                          <div className='flex gap-2'>
+                            <button 
+                              className='btn btn-xs' 
+                              onClick={() => openEditSubCategoryModal(subCategory)}
+                            >
+                              <Pencil className='w-3 h-3' />
+                            </button>
+                            <button 
+                              className='btn btn-xs btn-error' 
+                              onClick={() => handleDeleteSubCategory(subCategory.id)}
+                            >
+                              <Trash className='w-3 h-3' />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className='text-center py-4'>
+                        <p>No subcategories</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         ) : (
           <EmptyState
-            message={"Aucune catégorie disponible"}
+            message={"No categories available"}
             IconComponent='Group'
           />
         )}
       </div>
 
+      {/* Modals */}
       <CategoryModal
+        title={editMode ? "Edit Category" : "Create Category"}
         name={name}
         description={description}
         loading={loading}
-        onclose={closeModal}
+        onClose={() => (document.getElementById("category_modal") as HTMLDialogElement)?.close()}
         onChangeName={setName}
         onChangeDescription={setDescription}
         onSubmit={editMode ? handleUpdateCategory : handleCreateCategory}
-        editMode={editMode}
+      />
+
+      <SubCategoryModal
+        title={editMode ? "Edit Subcategory" : "Create Subcategory"}
+        name={name}
+        description={description}
+        loading={loading}
+        onClose={() => (document.getElementById("subcategory_modal") as HTMLDialogElement)?.close()}
+        onChangeName={setName}
+        onChangeDescription={setDescription}
+        onSubmit={editMode ? handleUpdateSubCategory : handleCreateSubCategory}
       />
     </Wrapper>
   )

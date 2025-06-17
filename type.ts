@@ -1,7 +1,9 @@
-import { Product as PrismaProduct, Transaction as PrismaTransaction, Destination as PrismaDestination } from "@prisma/client"
+// type.ts
+import { Product as PrismaProduct, Transaction as PrismaTransaction, Destination as PrismaDestination, SubCategory, Category } from "@prisma/client"
 
 export interface Product extends PrismaProduct {
     categoryName: string;
+    subCategoryName?: string;
 }
 
 export interface FormDataType {
@@ -10,9 +12,13 @@ export interface FormDataType {
     description: string;
     quantity?: number;
     categoryId?: string;
+    subCategoryId?: string | null 
     unit?: string;
     categoryName?: string;
+    subCategoryName?: string;
     imageUrl?: string;
+    reference?: string | null 
+    
 }
 
 export interface OrderItem {
@@ -22,6 +28,7 @@ export interface OrderItem {
     imageUrl: string;
     name: string;
     availableQuantity: number;
+    reference?: string;
 };
 
 export interface Destination extends PrismaDestination {
@@ -30,27 +37,29 @@ export interface Destination extends PrismaDestination {
 
 export interface Transaction extends PrismaTransaction {
     categoryName: string;
+    subCategoryName?: string;
+    
     productName: string;
     imageUrl?: string;
     unit: string;
-    destination?: {
-        id: string;
-        name: string;
-        description: string | null;
-        entrepriseId?: string | null;
-    };
+    reference?: string;
+    destination?: Destination;
 }
 
 export interface ProductOverviewStats {
     totalProducts: number;
     totalCategories: number;
+    totalSubCategories?: number;
     totalTransactions: number;
-    
 }
 
 export interface ChartData {
     name: string;
     value: number;
+    subCategories?: {
+        name: string;
+        value: number;
+    }[];
 }
 
 interface CriticalProduct {
@@ -58,8 +67,10 @@ interface CriticalProduct {
     name: string;
     quantity: number;
     categoryName: string;
+    subCategoryName?: string;
     imageUrl?: string;
     unit?: string;
+    reference?: string;
     lastRestocked?: Date; 
 }
   
@@ -75,4 +86,18 @@ export interface DestinationOption {
     value: string;
     label: string;
     description?: string;
+}
+
+export interface SubCategoryWithCount extends SubCategory {
+    _count?: {
+        products: number;
+    };
+    category?: Category;
+}
+
+export interface CategoryWithSub extends Category {
+    subCategories: SubCategoryWithCount[];
+    _count?: {
+        products: number;
+    };
 }

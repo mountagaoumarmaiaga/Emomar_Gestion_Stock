@@ -9,31 +9,33 @@ datasource db {
 }
 
 model Entreprise {
-  id           String        @id @default(uuid())
-  name         String
-  email        String        @unique
+  id             String        @id @default(uuid())
+  name           String
+  email          String        @unique
 
-  products     Product[]
-  categories   Category[]
-  transactions Transaction[]
-  destinations Destination[]
+  products       Product[]
+  categories     Category[]
+  subCategories  SubCategory[]
+  transactions   Transaction[]
+  destinations   Destination[]
 }
-
 
 model Product {
   id             String        @id @default(uuid())
+  reference      String?       @unique
   name           String
   description    String
   quantity       Int           @default(0)
   unit           String
-  price Float? @default(0) 
   imageUrl       String
 
   categoryId     String
-  entrepriseId  String?
+  subCategoryId  String?
+  entrepriseId   String?
 
   category       Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  entreprise    Entreprise?  @relation(fields: [entrepriseId], references: [id])
+  subCategory    SubCategory?  @relation(fields: [subCategoryId], references: [id], onDelete: SetNull)
+  entreprise     Entreprise?   @relation(fields: [entrepriseId], references: [id])
   transactions   Transaction[]
 
   createdAt      DateTime      @default(now())
@@ -45,32 +47,46 @@ model Category {
   name           String
   description    String?
 
-  entrepriseId  String?
-  entreprise   Entreprise?  @relation(fields: [entrepriseId], references: [id])
+  entrepriseId   String?
+  entreprise     Entreprise?   @relation(fields: [entrepriseId], references: [id])
   products       Product[]
+  subCategories  SubCategory[]
+}
+
+model SubCategory {
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  
+  categoryId     String
+  category       Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  products       Product[]
+
+  entrepriseId   String?
+  entreprise     Entreprise?   @relation(fields: [entrepriseId], references: [id])
 }
 
 model Destination {
-  id           String        @id @default(uuid())
-  name         String
-  description  String?
-  entrepriseId String?
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  entrepriseId   String?
   
-  entreprise   Entreprise?   @relation(fields: [entrepriseId], references: [id])
-  transactions Transaction[]
+  entreprise     Entreprise?   @relation(fields: [entrepriseId], references: [id])
+  transactions   Transaction[]
 }
 
 model Transaction {
-  id            String      @id @default(uuid())
-  type          String
-  quantity      Int
-  productId     String
-  entrepriseId  String?
-  destinationId String?
+  id             String        @id @default(uuid())
+  type           String
+  quantity       Int
+  productId      String
+  entrepriseId   String?
+  destinationId  String?
   
-  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  entreprise    Entreprise? @relation(fields: [entrepriseId], references: [id])
-  destination   Destination? @relation(fields: [destinationId], references: [id])
+  product        Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  entreprise     Entreprise?   @relation(fields: [entrepriseId], references: [id])
+  destination    Destination?  @relation(fields: [destinationId], references: [id])
 
-  createdAt     DateTime    @default(now())
+  createdAt      DateTime      @default(now())
 }
