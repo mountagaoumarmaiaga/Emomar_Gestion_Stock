@@ -191,7 +191,7 @@ const Page = () => {
       <div>
         <div className='mb-4'>
           <button className='btn btn-primary' onClick={openCreateModal}>
-            Add Category
+          Ajouter une catégorie
           </button>
         </div>
 
