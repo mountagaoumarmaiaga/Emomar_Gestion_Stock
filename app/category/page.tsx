@@ -37,16 +37,15 @@ const Page = () => {
       try {
         const data = await readCategoriesWithSub(email)
         setCategories(data)
-        
-        // Initialize subcategory visibility
+
         const visibility: Record<string, boolean> = {}
         data.forEach(cat => {
           visibility[cat.id] = false
         })
         setShowSubCategories(visibility)
       } catch (error) {
-        console.error("Failed to load categories", error)
-        toast.error("Failed to load categories")
+        console.error("Échec du chargement des catégories", error)
+        toast.error("Échec du chargement des catégories")
       }
     }
   }, [email])
@@ -55,7 +54,7 @@ const Page = () => {
     loadCategories()
   }, [loadCategories])
 
-  // Category handlers
+  // Gestion des catégories
   const openCreateModal = () => {
     setName("")
     setDescription("")
@@ -79,10 +78,10 @@ const Page = () => {
       await createCategory(name, email, description)
       await loadCategories()
       ;(document.getElementById("category_modal") as HTMLDialogElement)?.close()
-      toast.success("Category created successfully")
+      toast.success("Catégorie créée avec succès")
     } catch (error) {
       console.error(error)
-      toast.error("Failed to create category")
+      toast.error("Échec de la création de la catégorie")
     } finally {
       setLoading(false)
     }
@@ -95,28 +94,28 @@ const Page = () => {
       await updateCategory(editingId, email, name, description)
       await loadCategories()
       ;(document.getElementById("category_modal") as HTMLDialogElement)?.close()
-      toast.success("Category updated successfully")
+      toast.success("Catégorie mise à jour avec succès")
     } catch (error) {
       console.error(error)
-      toast.error("Failed to update category")
+      toast.error("Échec de la mise à jour de la catégorie")
     } finally {
       setLoading(false)
     }
   }
 
   const handleDeleteCategory = async (categoryId: string) => {
-    if (!confirm("Delete this category and all its subcategories?")) return
+    if (!confirm("Supprimer cette catégorie et toutes ses sous-catégories ?")) return
     try {
       await deleteCategory(categoryId, email)
       await loadCategories()
-      toast.success("Category deleted successfully")
+      toast.success("Catégorie supprimée avec succès")
     } catch (error) {
       console.error(error)
-      toast.error("Failed to delete category")
+      toast.error("Échec de la suppression de la catégorie")
     }
   }
 
-  // Subcategory handlers
+  // Gestion des sous-catégories
   const toggleSubCategories = (categoryId: string) => {
     setShowSubCategories(prev => ({
       ...prev,
@@ -149,10 +148,10 @@ const Page = () => {
       await createSubCategory(name, selectedCategoryId, email, description)
       await loadCategories()
       ;(document.getElementById("subcategory_modal") as HTMLDialogElement)?.close()
-      toast.success("Subcategory created successfully")
+      toast.success("Sous-catégorie créée avec succès")
     } catch (error) {
       console.error(error)
-      toast.error("Failed to create subcategory")
+      toast.error("Échec de la création de la sous-catégorie")
     } finally {
       setLoading(false)
     }
@@ -165,24 +164,24 @@ const Page = () => {
       await updateSubCategory(editingId, email, name, description)
       await loadCategories()
       ;(document.getElementById("subcategory_modal") as HTMLDialogElement)?.close()
-      toast.success("Subcategory updated successfully")
+      toast.success("Sous-catégorie mise à jour avec succès")
     } catch (error) {
       console.error(error)
-      toast.error("Failed to update subcategory")
+      toast.error("Échec de la mise à jour de la sous-catégorie")
     } finally {
       setLoading(false)
     }
   }
 
   const handleDeleteSubCategory = async (subCategoryId: string) => {
-    if (!confirm("Delete this subcategory?")) return
+    if (!confirm("Supprimer cette sous-catégorie ?")) return
     try {
       await deleteSubCategory(subCategoryId, email)
       await loadCategories()
-      toast.success("Subcategory deleted successfully")
+      toast.success("Sous-catégorie supprimée avec succès")
     } catch (error) {
       console.error(error)
-      toast.error("Failed to delete subcategory")
+      toast.error("Échec de la suppression de la sous-catégorie")
     }
   }
 
@@ -191,7 +190,7 @@ const Page = () => {
       <div>
         <div className='mb-4'>
           <button className='btn btn-primary' onClick={openCreateModal}>
-          Ajouter une catégorie
+            Ajouter une catégorie
           </button>
         </div>
 
@@ -261,7 +260,7 @@ const Page = () => {
                       ))
                     ) : (
                       <div className='text-center py-4'>
-                        <p>No subcategories</p>
+                        <p>Aucune sous-catégorie</p>
                       </div>
                     )}
                   </div>
@@ -271,15 +270,15 @@ const Page = () => {
           </div>
         ) : (
           <EmptyState
-            message={"No categories available"}
+            message={"Aucune catégorie disponible"}
             IconComponent='Group'
           />
         )}
       </div>
 
-      {/* Modals */}
+      {/* Modales */}
       <CategoryModal
-        title={editMode ? "Edit Category" : "Create Category"}
+        title={editMode ? "Modifier la catégorie" : "Créer une catégorie"}
         name={name}
         description={description}
         loading={loading}
@@ -290,7 +289,7 @@ const Page = () => {
       />
 
       <SubCategoryModal
-        title={editMode ? "Edit Subcategory" : "Create Subcategory"}
+        title={editMode ? "Modifier la sous-catégorie" : "Créer une sous-catégorie"}
         name={name}
         description={description}
         loading={loading}
