@@ -27,11 +27,13 @@ const TransactionsPage = () => {
         setIsLoading(true)
         try {
             if (email) {
-                const [productsData, transactionsData] = await Promise.all([
-                    readProducts(email),
+                const [productsResult, transactionsData] = await Promise.all([
+                    readProducts(email, { limit: 100, offset: 0 }), // ✅ on prend la liste paginée
                     getTransactions(email)
                 ])
-                if (productsData) setProducts(productsData)
+                if (productsResult && productsResult.products) {
+                    setProducts(productsResult.products) // ✅ on met juste le tableau
+                }
                 if (transactionsData) setTransactions(transactionsData)
             }
         } catch (error) {

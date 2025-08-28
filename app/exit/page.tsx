@@ -52,7 +52,10 @@ const Page = () => {
                 fetch(`/api/destinations?email=${email}`).then(res => res.json())
             ]);
             
-            if (productsRes) setProducts(productsRes);
+            // CORRECTION: Extraire les produits de la réponse
+            if (productsRes && productsRes.products) {
+                setProducts(productsRes.products);
+            }
             setDestinations(destinationsRes);
         } catch (error) {
             console.error(error);
@@ -76,7 +79,7 @@ const Page = () => {
                     ...prev,
                     {
                         productId: product.id,
-                        quantity: 0, // Initialisé à 0 pour permettre la saisie libre
+                        quantity: 1, // Changé de 0 à 1 pour une meilleure UX
                         unit: product.unit,
                         imageUrl: product.imageUrl,
                         name: product.name,
@@ -91,14 +94,12 @@ const Page = () => {
 
     const handleQuantityChange = (productId: string, quantity: number | '') => {
         if (quantity === '') {
-            // Permet de vider complètement le champ
             setOrder(prev => prev.map(item => 
                 item.productId === productId 
                     ? { ...item, quantity: 0 }
                     : item
             ));
         } else {
-            // Valider que la quantité est au moins 1
             const newQuantity = Math.max(1, quantity);
             setOrder(prev => prev.map(item => 
                 item.productId === productId 

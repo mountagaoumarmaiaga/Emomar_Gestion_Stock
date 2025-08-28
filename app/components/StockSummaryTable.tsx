@@ -53,7 +53,7 @@ const StockSummaryTable = ({ email }: { email: string }) => {
             </li>
             <li className="step step-primary">
                 <div>
-                    <span className='text-sm mr-4 font-bold '>Stock faible (≤ 2)</span>
+                    <span className='text-sm mr-4 font-bold '>Stock faible (≤ 20)</span>
                     <div className='badge badge-soft badge-warning font-bold'>{data.lowStockCount}</div>
                 </div>
             </li>

@@ -7,7 +7,7 @@ import { deleteProduct, readProducts } from '../actions'
 import EmptyState from '../components/EmptyState'
 import ProductImage from '../components/ProductImage'
 import Link from 'next/link'
-import { Trash, Search } from 'lucide-react'
+import { Trash, Search} from 'lucide-react'
 import { toast } from 'react-toastify'
 
 const ProductsPage = () => {
@@ -17,19 +17,31 @@ const ProductsPage = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  
+  // États pour la pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalProducts, setTotalProducts] = useState(0)
+  const productsPerPage = 10
 
   const fetchProducts = useCallback(async () => {
     try {
       setIsLoading(true)
       if (!email) return
 
+      const offset = (currentPage - 1) * productsPerPage
+      
       const result = await readProducts(email, {
         searchName: searchTerm,
-        categoryId: categoryFilter
+        categoryId: categoryFilter,
+        limit: productsPerPage,
+        offset: offset
       })
 
       if (result) {
-        setProducts(result)
+        setProducts(result.products)
+        setTotalPages(result.totalPages)
+        setTotalProducts(result.totalCount)
       }
     } catch (error) {
       console.error('Failed to fetch products:', error)
@@ -37,7 +49,11 @@ const ProductsPage = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [email, searchTerm, categoryFilter])
+  }, [email, searchTerm, categoryFilter, currentPage, productsPerPage])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, categoryFilter])
 
   useEffect(() => {
     fetchProducts()
@@ -54,13 +70,18 @@ const ProductsPage = () => {
           headers: { 'Content-Type': 'application/json' }
         })
 
-        if (!res.ok) throw new Error('Erreur lors de la suppression de l’image.')
+        if (!res.ok) throw new Error('Erreur lors de la suppression de l\'image.')
       }
 
       if (email) {
         await deleteProduct(product.id, email)
         toast.success('Produit supprimé avec succès')
-        await fetchProducts()
+        
+        if (products.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1)
+        } else {
+          await fetchProducts()
+        }
       }
     } catch (error) {
       console.error('Échec de la suppression:', error)
@@ -111,56 +132,87 @@ const ProductsPage = () => {
             IconComponent='PackageSearch'
           />
         ) : (
-          <table className='table'>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Image</th>
-                <th>Nom</th>
-                <th>Référence</th>
-                <th>Description</th>
-                <th>Quantité</th>
-                <th>Catégorie</th>
-                <th>Sous-catégorie</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((product, index) => (
-                <tr key={product.id}>
-                  <td>{index + 1}</td>
-                  <td>
-                    <ProductImage
-                      src={product.imageUrl}
-                      alt={product.name}
-                      heightClass='h-12'
-                      widthClass='w-12'
-                    />
-                  </td>
-                  <td>{product.name}</td>
-                  <td>{product.reference || '—'}</td>
-                  <td className="max-w-xs truncate">{product.description}</td>
-                  <td>{product.quantity} {product.unit}</td>
-                  <td>{product.categoryName}</td>
-                  <td>{product.subCategoryName || '—'}</td>
-                  <td className='flex gap-2'>
-                    <Link 
-                      href={`/update-product/${product.id}`}
-                      className='btn btn-xs btn-primary'
-                    >
-                      Modifier
-                    </Link>
-                    <button 
-                      onClick={() => handleDelete(product)}
-                      className='btn btn-xs btn-error'
-                    >
-                      <Trash className='w-4 h-4' />
-                    </button>
-                  </td>
+          <>
+            <table className='table'>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Image</th>
+                  <th>Nom</th>
+                  <th>Référence</th>
+                  <th>Description</th>
+                  <th>Quantité</th>
+                  <th>Catégorie</th>
+                  <th>Sous-catégorie</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {products.map((product, index) => (
+                  <tr key={product.id}>
+                    <td>{(currentPage - 1) * productsPerPage + index + 1}</td>
+                    <td>
+                      <ProductImage
+                        src={product.imageUrl}
+                        alt={product.name}
+                        heightClass='h-12'
+                        widthClass='w-12'
+                      />
+                    </td>
+                    <td>{product.name}</td>
+                    <td>{product.reference || '—'}</td>
+                    <td className="max-w-xs truncate">{product.description}</td>
+                    <td>{product.quantity} {product.unit}</td>
+                    <td>{product.categoryName}</td>
+                    <td>{product.subCategoryName || '—'}</td>
+                    <td className='flex gap-2'>
+                      <Link 
+                        href={`/update-product/${product.id}`}
+                        className='btn btn-xs btn-primary'
+                      >
+                        Modifier
+                      </Link>
+                      <button 
+                        onClick={() => handleDelete(product)}
+                        className='btn btn-xs btn-error'
+                      >
+                        <Trash className='w-4 h-4' />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            {/* Pagination avec le même design que TransactionsPage */}
+            {totalPages > 1 && (
+              <div className="flex flex-col md:flex-row justify-between items-center mt-6 gap-4">
+                <div className="text-sm text-gray-600">
+                  Affichage de {(currentPage - 1) * productsPerPage + 1} à {Math.min(currentPage * productsPerPage, totalProducts)} sur {totalProducts} produits
+                </div>
+                
+                <div className="join">
+                  <button
+                    className="join-item btn"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1 || isLoading}
+                  >
+                    «
+                  </button>
+                  <button className="join-item btn">
+                    Page {currentPage} sur {totalPages}
+                  </button>
+                  <button
+                    className="join-item btn"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages || isLoading}
+                  >
+                    »
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </Wrapper>

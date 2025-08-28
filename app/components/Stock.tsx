@@ -16,9 +16,9 @@ const Stock = () => {
     const fetchProducts = useCallback(async () => {
         try {
             if (email) {
-                const products = await readProducts(email)
-                if (products) {
-                    setProducts(products)
+                const result = await readProducts(email, { limit: 100, offset: 0 })
+                if (result && result.products) {
+                    setProducts(result.products) // ✅ seulement le tableau
                 }
             }
         } catch (error) {
@@ -65,8 +65,6 @@ const Stock = () => {
 
     return (
         <div>
-            
-
             <dialog id="my_modal_stock" className="modal">
                 <div className="modal-box">
                     <form method="dialog">

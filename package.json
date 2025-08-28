@@ -36,7 +36,7 @@
     "daisyui": "^5.0.23",
     "eslint": "^9",
     "eslint-config-next": "15.3.0",
-    "prisma": "^6.8.2",
+    "prisma": "^6.14.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

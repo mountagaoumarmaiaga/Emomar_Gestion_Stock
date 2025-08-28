@@ -289,8 +289,14 @@ export async function readProducts(
         categoryId?: string
         subCategoryId?: string
         reference?: string
+        limit?: number      // Nouveau paramètre pour la pagination
+        offset?: number     // Nouveau paramètre pour la pagination
     }
-): Promise<Product[]> {
+): Promise<{
+    products: Product[],
+    totalCount: number,
+    totalPages: number
+}> {
     try {
         const entreprise = await getEntreprise(email)
         if (!entreprise) throw new Error("Entreprise non trouvée")
@@ -310,20 +316,34 @@ export async function readProducts(
             ]
         }
 
+        // Compter le nombre total de produits correspondants aux filtres
+        const totalCount = await prisma.product.count({ where })
+
+        // Définir la limite par défaut à 10 produits par page
+        const limit = filters?.limit || 10
+        const totalPages = Math.ceil(totalCount / limit)
+
+        // Récupérer les produits avec pagination
         const products = await prisma.product.findMany({
             where,
             include: { 
                 category: true,
                 subCategory: true 
             },
-            orderBy: { name: 'asc' }
+            orderBy: { name: 'asc' },
+            take: limit,           // Nombre d'éléments à prendre
+            skip: filters?.offset || 0  // Nombre d'éléments à sauter
         })
 
-        return products.map(product => ({
-            ...product,
-            categoryName: product.category?.name || 'Non catégorisé',
-            subCategoryName: product.subCategory?.name || 'Non spécifiée'
-        }))
+        return {
+            products: products.map(product => ({
+                ...product,
+                categoryName: product.category?.name || 'Non catégorisé',
+                subCategoryName: product.subCategory?.name || 'Non spécifiée'
+            })),
+            totalCount,
+            totalPages
+        }
     } catch (error) {
         console.error("Erreur lecture produits:", error)
         throw error
