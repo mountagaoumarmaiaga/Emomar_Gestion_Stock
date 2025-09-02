@@ -11,8 +11,8 @@ import ProductImage from '../components/ProductImage'
 import { Trash, Plus, X, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { toast } from 'react-toastify'
 
-const DESTINATIONS_PER_PAGE = 5;
-const PRODUCTS_PER_PAGE = 12;
+const DESTINATIONS_PER_PAGE = 10;
+const PRODUCTS_PER_PAGE = 10000;
 
 type DeductStockResponse = {
   success: boolean;
