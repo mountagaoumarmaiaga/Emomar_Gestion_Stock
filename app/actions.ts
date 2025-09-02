@@ -183,7 +183,7 @@ export async function readCategoriesWithSub(email: string): Promise<CategoryWith
                 _count: { select: { products: true } }
             },
             orderBy: { name: 'asc' }
-    })
+        })
     } catch (error) {
         console.error("Erreur lecture catégories:", error)
         throw error
@@ -236,7 +236,6 @@ export async function createProduct(formData: FormDataType, email: string) {
                 unit: unit || "",
                 reference: reference || null,
                 entrepriseId: entreprise.id,
-                
             }
         })
     } catch (error) {
@@ -319,9 +318,9 @@ export async function readProducts(
 
         const totalCount = await prisma.product.count({ where })
 
-        // Pas de limite par défaut - laisser le client décider
-        const limit = filters?.limit;
-        const totalPages = limit ? Math.ceil(totalCount / limit) : 1;
+        // CORRECTION : Toujours utiliser une limite pour la pagination
+        const limit = filters?.limit || 50; // Limite par défaut de 50
+        const totalPages = Math.ceil(totalCount / limit);
 
         const products = await prisma.product.findMany({
             where,
