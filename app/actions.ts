@@ -317,14 +317,12 @@ export async function readProducts(
             ]
         }
 
-        // Compter le nombre total de produits correspondants aux filtres
         const totalCount = await prisma.product.count({ where })
 
-        // MODIFICATION IMPORTANTE : Pas de limite par défaut
-        const limit = filters?.limit || undefined;
+        // Pas de limite par défaut - laisser le client décider
+        const limit = filters?.limit;
         const totalPages = limit ? Math.ceil(totalCount / limit) : 1;
 
-        // Récupérer les produits avec pagination
         const products = await prisma.product.findMany({
             where,
             include: { 
@@ -332,7 +330,7 @@ export async function readProducts(
                 subCategory: true 
             },
             orderBy: { name: 'asc' },
-            take: limit,           // undefined = pas de limite
+            take: limit,
             skip: filters?.offset || 0
         })
 

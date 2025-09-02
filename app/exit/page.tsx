@@ -2,7 +2,7 @@
 
 import { OrderItem, Product, Destination } from '@/type'
 import { useUser } from '@clerk/nextjs'
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { deductStockWithTransaction, readProducts } from '../actions'
 import Wrapper from '../components/Wrapper'
 import ProductComponent from '../components/ProductComponent'
@@ -11,8 +11,9 @@ import ProductImage from '../components/ProductImage'
 import { Trash, Plus, X, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { toast } from 'react-toastify'
 
-const DESTINATIONS_PER_PAGE = 10;
-const PRODUCTS_PER_PAGE = 10000;
+const DESTINATIONS_PER_PAGE = 5;
+const PRODUCTS_PER_PAGE = 50;
+const SCROLL_THRESHOLD = 100;
 
 type DeductStockResponse = {
   success: boolean;
@@ -24,11 +25,13 @@ const Page = () => {
     const email = user?.primaryEmailAddress?.emailAddress as string
     
     // États produits
-    const [products, setProducts] = useState<Product[]>([])
+    const [allProducts, setAllProducts] = useState<Product[]>([]) // Tous les produits chargés
     const [order, setOrder] = useState<OrderItem[]>([])
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
-    const [currentProductPage, setCurrentProductPage] = useState(1)
+    const [hasMoreProducts, setHasMoreProducts] = useState(true)
+    const [isLoadingProducts, setIsLoadingProducts] = useState(false)
+    const productsContainerRef = useRef<HTMLDivElement>(null)
     
     // États destinations
     const [destinations, setDestinations] = useState<Destination[]>([])
@@ -45,27 +48,62 @@ const Page = () => {
     const [isLoading, setIsLoading] = useState(false)
 
     // Chargement des données
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (page = 1, append = false) => {
         try {
-            if (!email) return;
+            if (!email || isLoadingProducts) return;
+            
+            setIsLoadingProducts(true);
             
             const [productsRes, destinationsRes] = await Promise.all([
-                readProducts(email, { limit: 1000 }), // MODIFICATION ICI: Augmentation de la limite
+                readProducts(email, { 
+                    limit: PRODUCTS_PER_PAGE,
+                    offset: (page - 1) * PRODUCTS_PER_PAGE
+                }),
                 fetch(`/api/destinations?email=${email}`).then(res => res.json())
             ]);
             
-            // CORRECTION: Extraire les produits de la réponse
             if (productsRes && productsRes.products) {
-                setProducts(productsRes.products);
+                if (append) {
+                    setAllProducts(prev => [...prev, ...productsRes.products]);
+                } else {
+                    setAllProducts(productsRes.products);
+                }
+                
+                setHasMoreProducts(productsRes.products.length === PRODUCTS_PER_PAGE);
             }
             setDestinations(destinationsRes);
         } catch (error) {
             console.error(error);
             toast.error("Erreur de chargement des données");
+        } finally {
+            setIsLoadingProducts(false);
         }
-    }, [email]);
+    }, [email, isLoadingProducts]);
 
-    useEffect(() => { fetchData() }, [fetchData]);
+    // Chargement initial
+    useEffect(() => { 
+        fetchData(1, false);
+    }, [fetchData]);
+
+    // Défilement infini
+    useEffect(() => {
+        const handleScroll = () => {
+            if (!productsContainerRef.current || isLoadingProducts || !hasMoreProducts) return;
+            
+            const { scrollTop, scrollHeight, clientHeight } = productsContainerRef.current;
+            const isNearBottom = scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
+            
+            if (isNearBottom) {
+                fetchData(Math.floor(allProducts.length / PRODUCTS_PER_PAGE) + 1, true);
+            }
+        };
+
+        const container = productsContainerRef.current;
+        if (container) {
+            container.addEventListener('scroll', handleScroll);
+            return () => container.removeEventListener('scroll', handleScroll);
+        }
+    }, [isLoadingProducts, hasMoreProducts, fetchData, allProducts.length]);
 
     // Fonctions de gestion des produits
     const handleAddToCart = (product: Product) => {
@@ -167,13 +205,13 @@ const Page = () => {
 
             // Vérification des stocks
             const outOfStockItems = order.filter(item => {
-                const product = products.find(p => p.id === item.productId);
+                const product = allProducts.find(p => p.id === item.productId);
                 return product && item.quantity > product.quantity;
             });
 
             if (outOfStockItems.length > 0) {
                 const productNames = outOfStockItems.map(item => {
-                    const product = products.find(p => p.id === item.productId);
+                    const product = allProducts.find(p => p.id === item.productId);
                     return product?.name;
                 }).join(", ");
                 
@@ -215,8 +253,8 @@ const Page = () => {
                 setSelectedProductIds([]);
                 setSelectedDestinationId("");
                 setManualDestination("");
-                setCurrentProductPage(1);
-                fetchData();
+                setAllProducts([]);
+                fetchData(1, false);
             } else {
                 throw new Error(response?.message ?? "Erreur lors de la sortie du stock");
             }
@@ -228,16 +266,10 @@ const Page = () => {
         }
     };
 
-    // Filtres et pagination
-    const filteredProducts = products
+    // Filtres
+    const filteredProducts = allProducts
         .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
         .filter(p => !selectedProductIds.includes(p.id));
-
-    const totalProductPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
-    const paginatedProducts = filteredProducts.slice(
-        (currentProductPage - 1) * PRODUCTS_PER_PAGE,
-        currentProductPage * PRODUCTS_PER_PAGE
-    );
 
     const filteredDestinations = destinations
         .filter(d => 
@@ -257,23 +289,35 @@ const Page = () => {
                             placeholder='Rechercher un produit...'
                             className='input input-bordered w-full pl-10'
                             value={searchQuery}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                setCurrentProductPage(1);
-                            }}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
                     
-                    <div className='space-y-4 mb-4'>
-                        {paginatedProducts.length > 0 ? (
-                            paginatedProducts.map((product) => (
-                                <ProductComponent
-                                    key={product.id}
-                                    product={product}
-                                    add={true}
-                                    handleAddToCart={handleAddToCart}
-                                />
-                            ))
+                    <div 
+                        ref={productsContainerRef}
+                        className='space-y-4 mb-4 max-h-[calc(100vh-200px)] overflow-y-auto'
+                    >
+                        {filteredProducts.length > 0 ? (
+                            <>
+                                {filteredProducts.map((product) => (
+                                    <ProductComponent
+                                        key={product.id}
+                                        product={product}
+                                        add={true}
+                                        handleAddToCart={handleAddToCart}
+                                    />
+                                ))}
+                                {isLoadingProducts && (
+                                    <div className="flex justify-center py-4">
+                                        <span className="loading loading-spinner loading-md"></span>
+                                    </div>
+                                )}
+                                {!hasMoreProducts && filteredProducts.length > 20 && (
+                                    <div className="text-center text-sm text-gray-500 py-4">
+                                        Tous les produits sont chargés
+                                    </div>
+                                )}
+                            </>
                         ) : (
                             <EmptyState
                                 message='Aucun produit disponible'
@@ -281,37 +325,6 @@ const Page = () => {
                             />
                         )}
                     </div>
-
-                    {/* Pagination des produits */}
-                    {totalProductPages > 1 && (
-                        <div className="flex justify-center mt-4">
-                            <div className="join">
-                                <button 
-                                    className="join-item btn btn-sm"
-                                    onClick={() => setCurrentProductPage(p => Math.max(1, p - 1))}
-                                    disabled={currentProductPage === 1}
-                                >
-                                    <ChevronLeft size={16} />
-                                </button>
-                                {Array.from({ length: totalProductPages }, (_, i) => i + 1).map(page => (
-                                    <button
-                                        key={page}
-                                        className={`join-item btn btn-sm ${currentProductPage === page ? 'btn-primary' : ''}`}
-                                        onClick={() => setCurrentProductPage(page)}
-                                    >
-                                        {page}
-                                    </button>
-                                ))}
-                                <button 
-                                    className="join-item btn btn-sm"
-                                    onClick={() => setCurrentProductPage(p => Math.min(totalProductPages, p + 1))}
-                                    disabled={currentProductPage === totalProductPages}
-                                >
-                                    <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* Colonne commande */}
@@ -450,7 +463,7 @@ const Page = () => {
                                     </thead>
                                     <tbody>
                                         {order.map((item) => {
-                                            const product = products.find(p => p.id === item.productId);
+                                            const product = allProducts.find(p => p.id === item.productId);
                                             const isOutOfStock = product ? item.quantity > product.quantity : false;
                                             
                                             return (
