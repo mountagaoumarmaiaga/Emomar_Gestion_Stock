@@ -1,0 +1,24 @@
+[33m8fd74d2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{0}: checkout: moving from main to main
+[33m8fd74d2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{1}: checkout: moving from main to main
+[33m8fd74d2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{2}: checkout: moving from main to main
+[33m8fd74d2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{3}: commit: Résolution des conflits après merge
+[33m830f75c[m HEAD@{4}: checkout: moving from feature/nom-fonctionnalite to main
+[33md74c312[m[33m ([m[1;32mfeature/nom-fonctionnalite[m[33m)[m HEAD@{5}: commit: Ajout de la pagination sur les produits
+[33m830f75c[m HEAD@{6}: checkout: moving from main to feature/nom-fonctionnalite
+[33m830f75c[m HEAD@{7}: checkout: moving from main to main
+[33m830f75c[m HEAD@{8}: commit: amelioration003
+[33m857dfaf[m HEAD@{9}: commit: amelioration002
+[33md587df0[m HEAD@{10}: commit: amelioration001
+[33m7152a42[m HEAD@{11}: commit: Correction Supabase
+[33m3bbe9c9[m HEAD@{12}: commit: Correction des api2
+[33mc05e945[m HEAD@{13}: commit: Correction des api
+[33m61c4d9a[m HEAD@{14}: commit: Correction des types Transaction
+[33m242c792[m HEAD@{15}: commit: Correction
+[33m4e86cd0[m HEAD@{16}: commit: Correction des types Transaction et affichage des destinations
+[33m62ba9da[m HEAD@{17}: commit: Correction du système de filtrage et recherche des produits
+[33m8cb3447[m HEAD@{18}: commit (merge): Merge branch 'main' of https://github.com/mountagaoumarmaiaga/Emomar_Gestion_Stock
+[33m085f7dc[m HEAD@{19}: commit: Fix: generate Prisma Client during Vercel build
+[33m98ab747[m HEAD@{20}: commit: Correction
+[33m8b6ae7f[m HEAD@{21}: commit: Correction des polices Geist + configuration Clerk
+[33ma6d7f85[m HEAD@{22}: commit: Optimisation majeure: Correction useEffect/useCallback + refactoring
+[33m7fb7f4a[m HEAD@{23}: commit (initial): Initial commit

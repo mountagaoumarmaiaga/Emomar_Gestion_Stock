@@ -8,10 +8,11 @@ import Wrapper from '../components/Wrapper'
 import ProductComponent from '../components/ProductComponent'
 import EmptyState from '../components/EmptyState'
 import ProductImage from '../components/ProductImage'
-import { Trash, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Trash, Plus, X, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { toast } from 'react-toastify'
 
 const DESTINATIONS_PER_PAGE = 5;
+const PRODUCTS_PER_PAGE = 12;
 
 type DeductStockResponse = {
   success: boolean;
@@ -27,6 +28,7 @@ const Page = () => {
     const [order, setOrder] = useState<OrderItem[]>([])
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
+    const [currentProductPage, setCurrentProductPage] = useState(1)
     
     // États destinations
     const [destinations, setDestinations] = useState<Destination[]>([])
@@ -52,7 +54,6 @@ const Page = () => {
                 fetch(`/api/destinations?email=${email}`).then(res => res.json())
             ]);
             
-            // CORRECTION: Extraire les produits de la réponse
             if (productsRes && productsRes.products) {
                 setProducts(productsRes.products);
             }
@@ -79,7 +80,7 @@ const Page = () => {
                     ...prev,
                     {
                         productId: product.id,
-                        quantity: 1, // Changé de 0 à 1 pour une meilleure UX
+                        quantity: 1,
                         unit: product.unit,
                         imageUrl: product.imageUrl,
                         name: product.name,
@@ -213,6 +214,7 @@ const Page = () => {
                 setSelectedProductIds([]);
                 setSelectedDestinationId("");
                 setManualDestination("");
+                setCurrentProductPage(1);
                 fetchData();
             } else {
                 throw new Error(response?.message ?? "Erreur lors de la sortie du stock");
@@ -228,8 +230,13 @@ const Page = () => {
     // Filtres et pagination
     const filteredProducts = products
         .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-        .filter(p => !selectedProductIds.includes(p.id))
-        .slice(0, 10);
+        .filter(p => !selectedProductIds.includes(p.id));
+
+    const totalProductPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
+    const paginatedProducts = filteredProducts.slice(
+        (currentProductPage - 1) * PRODUCTS_PER_PAGE,
+        currentProductPage * PRODUCTS_PER_PAGE
+    );
 
     const filteredDestinations = destinations
         .filter(d => 
@@ -237,27 +244,28 @@ const Page = () => {
             (d.description && d.description.toLowerCase().includes(destinationSearch.toLowerCase()))
         );
 
-    const paginatedDestinations = filteredDestinations.slice(
-        (currentPage - 1) * DESTINATIONS_PER_PAGE,
-        currentPage * DESTINATIONS_PER_PAGE
-    );
-
     return (
         <Wrapper>
             <div className='flex md:flex-row flex-col-reverse gap-4'>
                 {/* Colonne produits */}
                 <div className='md:w-1/3'>
-                    <input
-                        type="text"
-                        placeholder='Rechercher un produit...'
-                        className='input input-bordered w-full mb-4'
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                    <div className="relative mb-4">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                        <input
+                            type="text"
+                            placeholder='Rechercher un produit...'
+                            className='input input-bordered w-full pl-10'
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setCurrentProductPage(1);
+                            }}
+                        />
+                    </div>
                     
-                    <div className='space-y-4'>
-                        {filteredProducts.length > 0 ? (
-                            filteredProducts.map((product) => (
+                    <div className='space-y-4 mb-4'>
+                        {paginatedProducts.length > 0 ? (
+                            paginatedProducts.map((product) => (
                                 <ProductComponent
                                     key={product.id}
                                     product={product}
@@ -272,25 +280,61 @@ const Page = () => {
                             />
                         )}
                     </div>
+
+                    {/* Pagination des produits */}
+                    {totalProductPages > 1 && (
+                        <div className="flex justify-center mt-4">
+                            <div className="join">
+                                <button 
+                                    className="join-item btn btn-sm"
+                                    onClick={() => setCurrentProductPage(p => Math.max(1, p - 1))}
+                                    disabled={currentProductPage === 1}
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+                                {Array.from({ length: totalProductPages }, (_, i) => i + 1).map(page => (
+                                    <button
+                                        key={page}
+                                        className={`join-item btn btn-sm ${currentProductPage === page ? 'btn-primary' : ''}`}
+                                        onClick={() => setCurrentProductPage(page)}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
+                                <button 
+                                    className="join-item btn btn-sm"
+                                    onClick={() => setCurrentProductPage(p => Math.min(totalProductPages, p + 1))}
+                                    disabled={currentProductPage === totalProductPages}
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Colonne commande */}
                 <div className='md:w-2/3 p-4 h-fit border-2 border-base-200 rounded-3xl'>
                     {order.length > 0 ? (
                         <>
+                            <h2 className="text-xl font-bold mb-4">Sortie de stock</h2>
+                            
                             {/* Sélection destination */}
                             <div className="mb-6 space-y-4">
                                 <div className="flex items-center gap-2">
-                                    <input
-                                        type="text"
-                                        placeholder="Rechercher une destination..."
-                                        className="input input-bordered flex-1"
-                                        value={destinationSearch}
-                                        onChange={(e) => {
-                                            setDestinationSearch(e.target.value)
-                                            setCurrentPage(1)
-                                        }}
-                                    />
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="Rechercher une destination..."
+                                            className="input input-bordered pl-10 w-full"
+                                            value={destinationSearch}
+                                            onChange={(e) => {
+                                                setDestinationSearch(e.target.value)
+                                                setCurrentPage(1)
+                                            }}
+                                        />
+                                    </div>
                                     <button 
                                         onClick={() => setShowAddDestination(!showAddDestination)}
                                         className="btn btn-square"
@@ -341,7 +385,7 @@ const Page = () => {
                                     }}
                                 >
                                     <option value="">Sélectionnez une destination</option>
-                                    {paginatedDestinations.map((dest) => (
+                                    {filteredDestinations.map((dest) => (
                                         <option key={dest.id} value={dest.id}>
                                             {dest.name} {dest.description && `(${dest.description})`}
                                         </option>
@@ -358,7 +402,7 @@ const Page = () => {
                                             <ChevronLeft size={16} />
                                         </button>
                                         <span className="flex items-center px-4">
-                                            Page {currentPage}
+                                            Page {currentPage} sur {Math.ceil(filteredDestinations.length / DESTINATIONS_PER_PAGE)}
                                         </span>
                                         <button 
                                             onClick={() => setCurrentPage(p => 
@@ -419,7 +463,7 @@ const Page = () => {
                                                         />
                                                     </td>
                                                     <td>
-                                                        {item.name}
+                                                        <div className="font-medium">{item.name}</div>
                                                         {isOutOfStock && (
                                                             <div className="text-error text-sm">Stock insuffisant</div>
                                                         )}
@@ -444,8 +488,8 @@ const Page = () => {
                                                             }}
                                                         />
                                                         {product && (
-                                                            <div className="text-sm text-gray-500">
-                                                                Stock disponible: {product.quantity}
+                                                            <div className="text-sm text-gray-500 mt-1">
+                                                                Stock: {product.quantity}
                                                             </div>
                                                         )}
                                                     </td>
