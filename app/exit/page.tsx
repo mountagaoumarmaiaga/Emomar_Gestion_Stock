@@ -2,7 +2,7 @@
 
 import { OrderItem, Product, Destination } from '@/type'
 import { useUser } from '@clerk/nextjs'
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { deductStockWithTransaction, readProducts } from '../actions'
 import Wrapper from '../components/Wrapper'
 import ProductComponent from '../components/ProductComponent'
@@ -12,8 +12,7 @@ import { Trash, Plus, X, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { toast } from 'react-toastify'
 
 const DESTINATIONS_PER_PAGE = 5;
-const PRODUCTS_PER_PAGE = 50;
-const SCROLL_THRESHOLD = 100;
+const PRODUCTS_PER_PAGE = 50; // 50 produits par page
 
 type DeductStockResponse = {
   success: boolean;
@@ -25,13 +24,13 @@ const Page = () => {
     const email = user?.primaryEmailAddress?.emailAddress as string
     
     // États produits
-    const [allProducts, setAllProducts] = useState<Product[]>([]) // Tous les produits chargés
+    const [allProducts, setAllProducts] = useState<Product[]>([])
     const [order, setOrder] = useState<OrderItem[]>([])
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
-    const [hasMoreProducts, setHasMoreProducts] = useState(true)
+    const [currentProductPage, setCurrentProductPage] = useState(1)
+    const [totalProductPages, setTotalProductPages] = useState(1)
     const [isLoadingProducts, setIsLoadingProducts] = useState(false)
-    const productsContainerRef = useRef<HTMLDivElement>(null)
     
     // États destinations
     const [destinations, setDestinations] = useState<Destination[]>([])
@@ -48,28 +47,23 @@ const Page = () => {
     const [isLoading, setIsLoading] = useState(false)
 
     // Chargement des données
-    const fetchData = useCallback(async (page = 1, append = false) => {
+    const fetchData = useCallback(async (productPage = 1) => {
         try {
-            if (!email || isLoadingProducts) return;
+            if (!email) return;
             
             setIsLoadingProducts(true);
             
             const [productsRes, destinationsRes] = await Promise.all([
                 readProducts(email, { 
                     limit: PRODUCTS_PER_PAGE,
-                    offset: (page - 1) * PRODUCTS_PER_PAGE
+                    offset: (productPage - 1) * PRODUCTS_PER_PAGE
                 }),
                 fetch(`/api/destinations?email=${email}`).then(res => res.json())
             ]);
             
             if (productsRes && productsRes.products) {
-                if (append) {
-                    setAllProducts(prev => [...prev, ...productsRes.products]);
-                } else {
-                    setAllProducts(productsRes.products);
-                }
-                
-                setHasMoreProducts(productsRes.products.length === PRODUCTS_PER_PAGE);
+                setAllProducts(productsRes.products);
+                setTotalProductPages(productsRes.totalPages);
             }
             setDestinations(destinationsRes);
         } catch (error) {
@@ -78,32 +72,17 @@ const Page = () => {
         } finally {
             setIsLoadingProducts(false);
         }
-    }, [email, isLoadingProducts]);
+    }, [email]);
 
     // Chargement initial
     useEffect(() => { 
-        fetchData(1, false);
+        fetchData(1);
     }, [fetchData]);
 
-    // Défilement infini
+    // Recharger les produits quand la page change
     useEffect(() => {
-        const handleScroll = () => {
-            if (!productsContainerRef.current || isLoadingProducts || !hasMoreProducts) return;
-            
-            const { scrollTop, scrollHeight, clientHeight } = productsContainerRef.current;
-            const isNearBottom = scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
-            
-            if (isNearBottom) {
-                fetchData(Math.floor(allProducts.length / PRODUCTS_PER_PAGE) + 1, true);
-            }
-        };
-
-        const container = productsContainerRef.current;
-        if (container) {
-            container.addEventListener('scroll', handleScroll);
-            return () => container.removeEventListener('scroll', handleScroll);
-        }
-    }, [isLoadingProducts, hasMoreProducts, fetchData, allProducts.length]);
+        fetchData(currentProductPage);
+    }, [currentProductPage, fetchData]);
 
     // Fonctions de gestion des produits
     const handleAddToCart = (product: Product) => {
@@ -253,8 +232,7 @@ const Page = () => {
                 setSelectedProductIds([]);
                 setSelectedDestinationId("");
                 setManualDestination("");
-                setAllProducts([]);
-                fetchData(1, false);
+                fetchData(currentProductPage);
             } else {
                 throw new Error(response?.message ?? "Erreur lors de la sortie du stock");
             }
@@ -293,38 +271,54 @@ const Page = () => {
                         />
                     </div>
                     
-                    <div 
-                        ref={productsContainerRef}
-                        className='space-y-4 mb-4 max-h-[calc(100vh-200px)] overflow-y-auto'
-                    >
+                    <div className='space-y-4 mb-4 max-h-[calc(100vh-250px)] overflow-y-auto'>
                         {filteredProducts.length > 0 ? (
-                            <>
-                                {filteredProducts.map((product) => (
-                                    <ProductComponent
-                                        key={product.id}
-                                        product={product}
-                                        add={true}
-                                        handleAddToCart={handleAddToCart}
-                                    />
-                                ))}
-                                {isLoadingProducts && (
-                                    <div className="flex justify-center py-4">
-                                        <span className="loading loading-spinner loading-md"></span>
-                                    </div>
-                                )}
-                                {!hasMoreProducts && filteredProducts.length > 20 && (
-                                    <div className="text-center text-sm text-gray-500 py-4">
-                                        Tous les produits sont chargés
-                                    </div>
-                                )}
-                            </>
+                            filteredProducts.map((product) => (
+                                <ProductComponent
+                                    key={product.id}
+                                    product={product}
+                                    add={true}
+                                    handleAddToCart={handleAddToCart}
+                                />
+                            ))
                         ) : (
                             <EmptyState
                                 message='Aucun produit disponible'
                                 IconComponent='PackageSearch'
                             />
                         )}
+                        
+                        {isLoadingProducts && (
+                            <div className="flex justify-center py-4">
+                                <span className="loading loading-spinner loading-md"></span>
+                            </div>
+                        )}
                     </div>
+
+                    {/* Pagination des produits */}
+                    {totalProductPages > 1 && (
+                        <div className="flex justify-center mt-4">
+                            <div className="join">
+                                <button 
+                                    className="join-item btn btn-sm"
+                                    onClick={() => setCurrentProductPage(p => Math.max(1, p - 1))}
+                                    disabled={currentProductPage === 1 || isLoadingProducts}
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+                                <button className="join-item btn btn-sm">
+                                    Page {currentProductPage} sur {totalProductPages}
+                                </button>
+                                <button 
+                                    className="join-item btn btn-sm"
+                                    onClick={() => setCurrentProductPage(p => Math.min(totalProductPages, p + 1))}
+                                    disabled={currentProductPage === totalProductPages || isLoadingProducts}
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Colonne commande */}
