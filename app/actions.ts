@@ -166,6 +166,7 @@ export async function readSubCategories(email: string, categoryId?: string): Pro
         throw error
     }
 }
+
 export async function readCategoriesWithSub(email: string): Promise<CategoryWithSub[]> {
     try {
         const entreprise = await getEntreprise(email)
@@ -182,7 +183,7 @@ export async function readCategoriesWithSub(email: string): Promise<CategoryWith
                 _count: { select: { products: true } }
             },
             orderBy: { name: 'asc' }
-        })
+    })
     } catch (error) {
         console.error("Erreur lecture catégories:", error)
         throw error
@@ -289,8 +290,8 @@ export async function readProducts(
         categoryId?: string
         subCategoryId?: string
         reference?: string
-        limit?: number      // Nouveau paramètre pour la pagination
-        offset?: number     // Nouveau paramètre pour la pagination
+        limit?: number
+        offset?: number
     }
 ): Promise<{
     products: Product[],
@@ -319,9 +320,9 @@ export async function readProducts(
         // Compter le nombre total de produits correspondants aux filtres
         const totalCount = await prisma.product.count({ where })
 
-        // Définir la limite par défaut à 10 produits par page
-        const limit = filters?.limit || 10
-        const totalPages = Math.ceil(totalCount / limit)
+        // MODIFICATION IMPORTANTE : Pas de limite par défaut
+        const limit = filters?.limit || undefined;
+        const totalPages = limit ? Math.ceil(totalCount / limit) : 1;
 
         // Récupérer les produits avec pagination
         const products = await prisma.product.findMany({
@@ -331,8 +332,8 @@ export async function readProducts(
                 subCategory: true 
             },
             orderBy: { name: 'asc' },
-            take: limit,           // Nombre d'éléments à prendre
-            skip: filters?.offset || 0  // Nombre d'éléments à sauter
+            take: limit,           // undefined = pas de limite
+            skip: filters?.offset || 0
         })
 
         return {

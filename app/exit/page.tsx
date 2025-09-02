@@ -50,10 +50,11 @@ const Page = () => {
             if (!email) return;
             
             const [productsRes, destinationsRes] = await Promise.all([
-                readProducts(email),
+                readProducts(email, { limit: 1000 }), // MODIFICATION ICI: Augmentation de la limite
                 fetch(`/api/destinations?email=${email}`).then(res => res.json())
             ]);
             
+            // CORRECTION: Extraire les produits de la réponse
             if (productsRes && productsRes.products) {
                 setProducts(productsRes.products);
             }
