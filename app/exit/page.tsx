@@ -12,7 +12,7 @@ import { Trash, Plus, X, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { toast } from 'react-toastify'
 
 const DESTINATIONS_PER_PAGE = 5;
-const PRODUCTS_PER_PAGE = 50; // 50 produits par page
+const PRODUCTS_PER_PAGE = 50;
 
 type DeductStockResponse = {
   success: boolean;
@@ -24,13 +24,11 @@ const Page = () => {
     const email = user?.primaryEmailAddress?.emailAddress as string
     
     // États produits
-    const [allProducts, setAllProducts] = useState<Product[]>([])
+    const [products, setProducts] = useState<Product[]>([])
     const [order, setOrder] = useState<OrderItem[]>([])
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
     const [currentProductPage, setCurrentProductPage] = useState(1)
-    const [totalProductPages, setTotalProductPages] = useState(1)
-    const [isLoadingProducts, setIsLoadingProducts] = useState(false)
     
     // États destinations
     const [destinations, setDestinations] = useState<Destination[]>([])
@@ -47,42 +45,27 @@ const Page = () => {
     const [isLoading, setIsLoading] = useState(false)
 
     // Chargement des données
-    const fetchData = useCallback(async (productPage = 1) => {
+    const fetchData = useCallback(async () => {
         try {
             if (!email) return;
             
-            setIsLoadingProducts(true);
-            
             const [productsRes, destinationsRes] = await Promise.all([
-                readProducts(email, { 
-                    limit: PRODUCTS_PER_PAGE,
-                    offset: (productPage - 1) * PRODUCTS_PER_PAGE
-                }),
+                readProducts(email, { limit: 1000 }), // MODIFICATION ICI: Augmentation de la limite
                 fetch(`/api/destinations?email=${email}`).then(res => res.json())
             ]);
             
+            // CORRECTION: Extraire les produits de la réponse
             if (productsRes && productsRes.products) {
-                setAllProducts(productsRes.products);
-                setTotalProductPages(productsRes.totalPages);
+                setProducts(productsRes.products);
             }
             setDestinations(destinationsRes);
         } catch (error) {
             console.error(error);
             toast.error("Erreur de chargement des données");
-        } finally {
-            setIsLoadingProducts(false);
         }
     }, [email]);
 
-    // Chargement initial
-    useEffect(() => { 
-        fetchData(1);
-    }, [fetchData]);
-
-    // Recharger les produits quand la page change
-    useEffect(() => {
-        fetchData(currentProductPage);
-    }, [currentProductPage, fetchData]);
+    useEffect(() => { fetchData() }, [fetchData]);
 
     // Fonctions de gestion des produits
     const handleAddToCart = (product: Product) => {
@@ -184,13 +167,13 @@ const Page = () => {
 
             // Vérification des stocks
             const outOfStockItems = order.filter(item => {
-                const product = allProducts.find(p => p.id === item.productId);
+                const product = products.find(p => p.id === item.productId);
                 return product && item.quantity > product.quantity;
             });
 
             if (outOfStockItems.length > 0) {
                 const productNames = outOfStockItems.map(item => {
-                    const product = allProducts.find(p => p.id === item.productId);
+                    const product = products.find(p => p.id === item.productId);
                     return product?.name;
                 }).join(", ");
                 
@@ -232,7 +215,8 @@ const Page = () => {
                 setSelectedProductIds([]);
                 setSelectedDestinationId("");
                 setManualDestination("");
-                fetchData(currentProductPage);
+                setCurrentProductPage(1);
+                fetchData();
             } else {
                 throw new Error(response?.message ?? "Erreur lors de la sortie du stock");
             }
@@ -244,10 +228,16 @@ const Page = () => {
         }
     };
 
-    // Filtres
-    const filteredProducts = allProducts
+    // Filtres et pagination
+    const filteredProducts = products
         .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
         .filter(p => !selectedProductIds.includes(p.id));
+
+    const totalProductPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
+    const paginatedProducts = filteredProducts.slice(
+        (currentProductPage - 1) * PRODUCTS_PER_PAGE,
+        currentProductPage * PRODUCTS_PER_PAGE
+    );
 
     const filteredDestinations = destinations
         .filter(d => 
@@ -267,13 +257,16 @@ const Page = () => {
                             placeholder='Rechercher un produit...'
                             className='input input-bordered w-full pl-10'
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setCurrentProductPage(1);
+                            }}
                         />
                     </div>
                     
-                    <div className='space-y-4 mb-4 max-h-[calc(100vh-250px)] overflow-y-auto'>
-                        {filteredProducts.length > 0 ? (
-                            filteredProducts.map((product) => (
+                    <div className='space-y-4 mb-4'>
+                        {paginatedProducts.length > 0 ? (
+                            paginatedProducts.map((product) => (
                                 <ProductComponent
                                     key={product.id}
                                     product={product}
@@ -287,12 +280,6 @@ const Page = () => {
                                 IconComponent='PackageSearch'
                             />
                         )}
-                        
-                        {isLoadingProducts && (
-                            <div className="flex justify-center py-4">
-                                <span className="loading loading-spinner loading-md"></span>
-                            </div>
-                        )}
                     </div>
 
                     {/* Pagination des produits */}
@@ -302,17 +289,23 @@ const Page = () => {
                                 <button 
                                     className="join-item btn btn-sm"
                                     onClick={() => setCurrentProductPage(p => Math.max(1, p - 1))}
-                                    disabled={currentProductPage === 1 || isLoadingProducts}
+                                    disabled={currentProductPage === 1}
                                 >
                                     <ChevronLeft size={16} />
                                 </button>
-                                <button className="join-item btn btn-sm">
-                                    Page {currentProductPage} sur {totalProductPages}
-                                </button>
+                                {Array.from({ length: totalProductPages }, (_, i) => i + 1).map(page => (
+                                    <button
+                                        key={page}
+                                        className={`join-item btn btn-sm ${currentProductPage === page ? 'btn-primary' : ''}`}
+                                        onClick={() => setCurrentProductPage(page)}
+                                    >
+                                        {page}
+                                    </button>
+                                ))}
                                 <button 
                                     className="join-item btn btn-sm"
                                     onClick={() => setCurrentProductPage(p => Math.min(totalProductPages, p + 1))}
-                                    disabled={currentProductPage === totalProductPages || isLoadingProducts}
+                                    disabled={currentProductPage === totalProductPages}
                                 >
                                     <ChevronRight size={16} />
                                 </button>
@@ -457,7 +450,7 @@ const Page = () => {
                                     </thead>
                                     <tbody>
                                         {order.map((item) => {
-                                            const product = allProducts.find(p => p.id === item.productId);
+                                            const product = products.find(p => p.id === item.productId);
                                             const isOutOfStock = product ? item.quantity > product.quantity : false;
                                             
                                             return (
