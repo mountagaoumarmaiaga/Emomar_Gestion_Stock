@@ -12,7 +12,7 @@ import { Trash, Plus, X, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { toast } from 'react-toastify'
 
 const DESTINATIONS_PER_PAGE = 5;
-const PRODUCTS_PER_PAGE = 50;
+const PRODUCTS_PER_PAGE = 10; // Réduit à 10 pour tester la pagination
 
 type DeductStockResponse = {
   success: boolean;
@@ -24,11 +24,14 @@ const Page = () => {
     const email = user?.primaryEmailAddress?.emailAddress as string
     
     // États produits
-    const [products, setProducts] = useState<Product[]>([])
+    const [allProducts, setAllProducts] = useState<Product[]>([])
     const [order, setOrder] = useState<OrderItem[]>([])
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
     const [currentProductPage, setCurrentProductPage] = useState(1)
+    const [totalProductPages, setTotalProductPages] = useState(1)
+    const [isLoadingProducts, setIsLoadingProducts] = useState(false)
+    const [totalProductsCount, setTotalProductsCount] = useState(0)
     
     // États destinations
     const [destinations, setDestinations] = useState<Destination[]>([])
@@ -45,27 +48,52 @@ const Page = () => {
     const [isLoading, setIsLoading] = useState(false)
 
     // Chargement des données
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (productPage = 1) => {
         try {
             if (!email) return;
             
+            setIsLoadingProducts(true);
+            
+            const offset = (productPage - 1) * PRODUCTS_PER_PAGE;
+            console.log('📋 Chargement page:', productPage, 'Offset:', offset, 'Limit:', PRODUCTS_PER_PAGE);
+            
             const [productsRes, destinationsRes] = await Promise.all([
-                readProducts(email, { limit: 1000 }), // MODIFICATION ICI: Augmentation de la limite
+                readProducts(email, { 
+                    limit: PRODUCTS_PER_PAGE,
+                    offset: offset
+                }),
                 fetch(`/api/destinations?email=${email}`).then(res => res.json())
             ]);
             
-            // CORRECTION: Extraire les produits de la réponse
+            console.log('📦 Réponse:', {
+                produits: productsRes.products.length,
+                total: productsRes.totalCount,
+                pages: productsRes.totalPages
+            });
+            
             if (productsRes && productsRes.products) {
-                setProducts(productsRes.products);
+                setAllProducts(productsRes.products);
+                setTotalProductPages(productsRes.totalPages);
+                setTotalProductsCount(productsRes.totalCount);
             }
             setDestinations(destinationsRes);
         } catch (error) {
             console.error(error);
             toast.error("Erreur de chargement des données");
+        } finally {
+            setIsLoadingProducts(false);
         }
     }, [email]);
 
-    useEffect(() => { fetchData() }, [fetchData]);
+    // Chargement initial
+    useEffect(() => { 
+        fetchData(1);
+    }, [fetchData]);
+
+    // Recharger les produits quand la page change
+    useEffect(() => {
+        fetchData(currentProductPage);
+    }, [currentProductPage, fetchData]);
 
     // Fonctions de gestion des produits
     const handleAddToCart = (product: Product) => {
@@ -167,13 +195,13 @@ const Page = () => {
 
             // Vérification des stocks
             const outOfStockItems = order.filter(item => {
-                const product = products.find(p => p.id === item.productId);
+                const product = allProducts.find(p => p.id === item.productId);
                 return product && item.quantity > product.quantity;
             });
 
             if (outOfStockItems.length > 0) {
                 const productNames = outOfStockItems.map(item => {
-                    const product = products.find(p => p.id === item.productId);
+                    const product = allProducts.find(p => p.id === item.productId);
                     return product?.name;
                 }).join(", ");
                 
@@ -215,8 +243,7 @@ const Page = () => {
                 setSelectedProductIds([]);
                 setSelectedDestinationId("");
                 setManualDestination("");
-                setCurrentProductPage(1);
-                fetchData();
+                fetchData(currentProductPage);
             } else {
                 throw new Error(response?.message ?? "Erreur lors de la sortie du stock");
             }
@@ -228,16 +255,10 @@ const Page = () => {
         }
     };
 
-    // Filtres et pagination
-    const filteredProducts = products
+    // Filtres
+    const filteredProducts = allProducts
         .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
         .filter(p => !selectedProductIds.includes(p.id));
-
-    const totalProductPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
-    const paginatedProducts = filteredProducts.slice(
-        (currentProductPage - 1) * PRODUCTS_PER_PAGE,
-        currentProductPage * PRODUCTS_PER_PAGE
-    );
 
     const filteredDestinations = destinations
         .filter(d => 
@@ -257,16 +278,18 @@ const Page = () => {
                             placeholder='Rechercher un produit...'
                             className='input input-bordered w-full pl-10'
                             value={searchQuery}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                setCurrentProductPage(1);
-                            }}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                         />
                     </div>
                     
-                    <div className='space-y-4 mb-4'>
-                        {paginatedProducts.length > 0 ? (
-                            paginatedProducts.map((product) => (
+                    {/* Info sur le nombre de produits */}
+                    <div className="text-sm text-gray-500 mb-2">
+                        {totalProductsCount} produits au total • Page {currentProductPage}/{totalProductPages}
+                    </div>
+                    
+                    <div className='space-y-4 mb-4 max-h-[calc(100vh-250px)] overflow-y-auto'>
+                        {filteredProducts.length > 0 ? (
+                            filteredProducts.map((product) => (
                                 <ProductComponent
                                     key={product.id}
                                     product={product}
@@ -280,35 +303,69 @@ const Page = () => {
                                 IconComponent='PackageSearch'
                             />
                         )}
+                        
+                        {isLoadingProducts && (
+                            <div className="flex justify-center py-4">
+                                <span className="loading loading-spinner loading-md"></span>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Pagination des produits */}
-                    {totalProductPages > 1 && (
-                        <div className="flex justify-center mt-4">
-                            <div className="join">
-                                <button 
-                                    className="join-item btn btn-sm"
-                                    onClick={() => setCurrentProductPage(p => Math.max(1, p - 1))}
-                                    disabled={currentProductPage === 1}
-                                >
-                                    <ChevronLeft size={16} />
-                                </button>
-                                {Array.from({ length: totalProductPages }, (_, i) => i + 1).map(page => (
-                                    <button
-                                        key={page}
-                                        className={`join-item btn btn-sm ${currentProductPage === page ? 'btn-primary' : ''}`}
-                                        onClick={() => setCurrentProductPage(page)}
-                                    >
-                                        {page}
-                                    </button>
-                                ))}
-                                <button 
-                                    className="join-item btn btn-sm"
-                                    onClick={() => setCurrentProductPage(p => Math.min(totalProductPages, p + 1))}
-                                    disabled={currentProductPage === totalProductPages}
-                                >
-                                    <ChevronRight size={16} />
-                                </button>
+                    {/* PAGINATION VISIBLE */}
+                    {(totalProductPages > 1 || totalProductsCount > PRODUCTS_PER_PAGE) && (
+                        <div className="bg-base-200 p-4 rounded-lg mt-4">
+                            <div className="flex flex-col items-center space-y-2">
+                                <div className="text-sm font-medium">
+                                    {totalProductsCount} produits • Page {currentProductPage} sur {totalProductPages}
+                                </div>
+                                
+                                {totalProductPages > 1 && (
+                                    <div className="join">
+                                        <button 
+                                            className="join-item btn btn-sm btn-primary"
+                                            onClick={() => setCurrentProductPage(1)}
+                                            disabled={currentProductPage === 1 || isLoadingProducts}
+                                        >
+                                            « Première
+                                        </button>
+                                        
+                                        <button 
+                                            className="join-item btn btn-sm btn-primary"
+                                            onClick={() => setCurrentProductPage(p => Math.max(1, p - 1))}
+                                            disabled={currentProductPage === 1 || isLoadingProducts}
+                                        >
+                                            <ChevronLeft size={16} />
+                                            Précédent
+                                        </button>
+                                        
+                                        <div className="join-item px-4 flex items-center bg-base-100 font-medium">
+                                            Page {currentProductPage}
+                                        </div>
+                                        
+                                        <button 
+                                            className="join-item btn btn-sm btn-primary"
+                                            onClick={() => setCurrentProductPage(p => Math.min(totalProductPages, p + 1))}
+                                            disabled={currentProductPage === totalProductPages || isLoadingProducts}
+                                        >
+                                            Suivant
+                                            <ChevronRight size={16} />
+                                        </button>
+                                        
+                                        <button 
+                                            className="join-item btn btn-sm btn-primary"
+                                            onClick={() => setCurrentProductPage(totalProductPages)}
+                                            disabled={currentProductPage === totalProductPages || isLoadingProducts}
+                                        >
+                                            Dernière »
+                                        </button>
+                                    </div>
+                                )}
+                                
+                                {totalProductPages === 1 && totalProductsCount > PRODUCTS_PER_PAGE && (
+                                    <div className="text-warning text-sm">
+                                        ⚠️ Tous les produits sont affichés sur une seule page
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -450,7 +507,7 @@ const Page = () => {
                                     </thead>
                                     <tbody>
                                         {order.map((item) => {
-                                            const product = products.find(p => p.id === item.productId);
+                                            const product = allProducts.find(p => p.id === item.productId);
                                             const isOutOfStock = product ? item.quantity > product.quantity : false;
                                             
                                             return (

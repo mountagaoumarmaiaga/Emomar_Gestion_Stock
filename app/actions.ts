@@ -319,7 +319,7 @@ export async function readProducts(
         const totalCount = await prisma.product.count({ where })
 
         // CORRECTION : Toujours utiliser une limite pour la pagination
-        const limit = filters?.limit || 50; // Limite par défaut de 50
+        const limit = filters?.limit !== undefined ? filters.limit : 10; // Limite par défaut de 50
         const totalPages = Math.ceil(totalCount / limit);
 
         const products = await prisma.product.findMany({
