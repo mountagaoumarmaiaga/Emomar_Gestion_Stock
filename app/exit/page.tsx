@@ -320,45 +320,51 @@ const Page = () => {
                                 </div>
                                 
                                 {totalProductPages > 1 && (
-                                    <div className="join">
-                                        <button 
-                                            className="join-item btn btn-sm btn-primary"
-                                            onClick={() => setCurrentProductPage(1)}
-                                            disabled={currentProductPage === 1 || isLoadingProducts}
-                                        >
-                                            « Première
-                                        </button>
-                                        
-                                        <button 
-                                            className="join-item btn btn-sm btn-primary"
-                                            onClick={() => setCurrentProductPage(p => Math.max(1, p - 1))}
-                                            disabled={currentProductPage === 1 || isLoadingProducts}
-                                        >
-                                            <ChevronLeft size={16} />
-                                            Précédent
-                                        </button>
-                                        
-                                        <div className="join-item px-4 flex items-center bg-base-100 font-medium">
-                                            Page {currentProductPage}
-                                        </div>
-                                        
-                                        <button 
-                                            className="join-item btn btn-sm btn-primary"
-                                            onClick={() => setCurrentProductPage(p => Math.min(totalProductPages, p + 1))}
-                                            disabled={currentProductPage === totalProductPages || isLoadingProducts}
-                                        >
-                                            Suivant
-                                            <ChevronRight size={16} />
-                                        </button>
-                                        
-                                        <button 
-                                            className="join-item btn btn-sm btn-primary"
-                                            onClick={() => setCurrentProductPage(totalProductPages)}
-                                            disabled={currentProductPage === totalProductPages || isLoadingProducts}
-                                        >
-                                            Dernière »
-                                        </button>
-                                    </div>
+                                    <div className="flex justify-center mt-4">
+  <div className="join">
+    {/* Première page */}
+    <button
+      className="join-item btn btn-sm"
+      onClick={() => setCurrentProductPage(1)}
+      disabled={currentProductPage === 1 || isLoadingProducts}
+    >
+      «
+    </button>
+
+    {/* Précédent */}
+    <button
+      className="join-item btn btn-sm"
+      onClick={() => setCurrentProductPage((p) => Math.max(1, p - 1))}
+      disabled={currentProductPage === 1 || isLoadingProducts}
+    >
+      <ChevronLeft size={16} />
+    </button>
+
+    {/* Numéro de page actif */}
+    <button className="join-item btn btn-sm btn-primary">
+      {currentProductPage} / {totalProductPages}
+    </button>
+
+    {/* Suivant */}
+    <button
+      className="join-item btn btn-sm"
+      onClick={() => setCurrentProductPage((p) => Math.min(totalProductPages, p + 1))}
+      disabled={currentProductPage === totalProductPages || isLoadingProducts}
+    >
+      <ChevronRight size={16} />
+    </button>
+
+    {/* Dernière page */}
+    <button
+      className="join-item btn btn-sm"
+      onClick={() => setCurrentProductPage(totalProductPages)}
+      disabled={currentProductPage === totalProductPages || isLoadingProducts}
+    >
+      »
+    </button>
+  </div>
+</div>
+
                                 )}
                                 
                                 {totalProductPages === 1 && totalProductsCount > PRODUCTS_PER_PAGE && (
